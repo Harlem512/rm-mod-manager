@@ -1,0 +1,499 @@
+if global.rmml {
+  return global.rmml.throw("bypassed rmml loader")
+}
+
+-- outside of the rmml global for fast access
+-- the currently running mod
+global.rmml_current_mod = "rmml"
+-- event_key = "controller_events_create" | "basic_events_other_room_start"
+-- mod_name = "my_mod"
+-- type: { [event_key: string]: { [mod_name: string]: function } }
+global.rmml_map = {}
+
+-- MARK: DATA
+global.rmml = {
+  -- internal version number
+  version: 5.4,
+  -- enables developer features
+  dev: true,
+
+  -- rmml's mod list, stored as mod names names
+  mod_list: [],
+  -- a string containing any errors thrown during the loading process (separated by pipes `|`)
+  errors: "",
+
+  -- object names
+  objects: ["controller", "instance", "basic", "player", "enemy", "hitbox"],
+  -- event names
+  events: [
+    "create", "cleanup", "step_begin", "step", "step_end", "draw_begin", "draw", "draw_end", "draw_gui_begin", "draw_gui", "draw_gui_end", "alarm_0", "alarm_1", "alarm_2", "destroy", "animation_end",
+    -- index >=16 needs `_events_other_`, otherwise `_events_`
+    "user_0", "user_1", "user_2", "room_start", "room_end"
+  ],
+
+  -- rmml's log file
+  log_name: "mods/log.txt",
+  -- clears the rmml log
+  clear: fun () {
+    let log = file_text_open_write(global.rmml.log_name)
+    file_text_write_string(log, "---LOGGING START---\n")
+    file_text_close(log)
+  },
+  -- logs the passed message as a string
+  log: fun (msg) {
+    let time = get_timer() // 1000
+    let log = file_text_open_append(global.rmml.log_name)
+    file_text_write_string(log,
+      string(time)
+      + "\t| "
+      + global.rmml_current_mod
+      + "\t| "
+      + string(msg)
+      + "\n"
+    )
+    file_text_close(log)
+  },
+  -- crashes the game with a message
+  throw: fun (msg) {
+    if global.rmml.__catch {
+      global.rmml.errors += "|" + string(msg)
+      return
+    }
+
+    let str = "\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\nRMML ERROR   RMML ERROR   RMML ERROR   RMML ERROR   RMML ERROR   RMML ERROR   RMML ERROR\n    Suspect Mod: " + string(global.rmml_current_mod) + "\n" + string(msg) + "\n.\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n"
+    !str
+  },
+}
+
+-- MARK: Try-Catch
+live_snippet_call(live_snippet_create("
+global.rmml.try_catch = function (_try, _catch, a,b,c,d,e,f,g,h) {
+  try {
+    return _try(a,b,c,d,e,f,g,h)
+  } catch (err) {
+    return _catch ? _catch(err) : err
+  }
+}
+"))
+
+
+-- MARK: Register
+let raw_code_normal = "
+e=global.rmml_map[\"INJECT\"][self.mod_name]
+if e{
+c=global.rmml_current_mod
+global.rmml_current_mod=self.mod_name
+e.setSelf(self)
+e()
+global.rmml_current_mod=c}"
+let raw_code_player = "with omod_player{" + raw_code_normal + "}"
+let raw_code_mod_name = "if self.mod_name == undefined { self.mod_name=global.rmml_current_mod }"
+
+global.rmml.__HIR = [
+  global.__catspeak__.parseString(raw_code_normal),
+  global.__catspeak__.parseString(raw_code_player),
+  global.__catspeak__.parseString(raw_code_mod_name + raw_code_normal),
+  global.__catspeak__.parseString(raw_code_mod_name + raw_code_player),
+]
+
+-- ev_key is a key used by `global.mod_map`
+global.rmml.register = fun (object, event, mod, fn) {
+  -- build event key
+  let o_index = __scribble_array_find_index(global.rmml.objects, object)
+  let e_index = __scribble_array_find_index(global.rmml.events, event)
+
+  if o_index == -1 or e_index == -1 {
+    global.rmml.throw(["Invalid object/event for register", object, event, o_index, e_index, mod])
+    return
+  }
+
+  let ev_key = object + (if e_index >= 16 { "_events_other_" } else { "_events_" }) + event
+
+  -- create RM mod_map entry
+  if !global.rmml_map[ev_key] {
+    -- pick which of the three HIR to use
+    let hir = global.rmml.__HIR[(o_index == 3) + (e_index == 0) << 1]
+    -- update event key through HIR injection
+    hir.functions[0].root.terms[e_index == 0].value.collection.key.value = ev_key
+    -- DEBUG: used if event name is stored in a variable
+    -- hir.functions[0].root.terms[0].value.value = ev_key
+
+    -- add compiled function to rm mod map
+    let fn = global.__catspeak__.compile(hir)
+    ds_map_set(global.mod_map, ev_key, fn)
+    global.rmml_map[ev_key] = {}
+    global.rmml.log(["Created Event", ev_key, mod ])
+  }
+
+  -- register event with rmml
+  global.rmml.log(["Registered Event", ev_key, mod])
+  global.rmml_map[ev_key][mod] = fn
+
+  -- return true since we need a controller
+  return o_index == 0
+}
+
+-- MARK: Unload
+global.rmml.unload = fun (mod_name) {
+  if mod_name == undefined {
+    mod_name = global.rmml_current_mod
+  }
+
+  global.rmml.log(["unloading", mod_name])
+
+  -- destroy first, so destroy/cleanup events run
+  with omod_controller {
+    if self.mod_name == mod_name {
+      instance_destroy(self, true)
+      return
+    }
+  }
+
+  -- rip keys from global.mod_map
+  let keys = variable_struct_get_names(global.rmml_map)
+  let i = 0
+  while i < array_length(keys) {
+    let key = keys[i]
+    struct_remove(global.rmml_map[key], mod_name)
+    -- rip data from mose and rmml mod maps
+    if array_length(variable_struct_get_names(global.rmml_map[key])) == 0 {
+      struct_remove(global.rmml_map, key)
+      ds_map_delete(global.mod_map, key)
+    }
+    i += 1
+  }
+}
+
+-- MARK: Load INI
+-- loads the passed file path as an ini mod
+global.rmml.__load_ini_path = fun (ini_path, mod_name) {
+  ini_open("mods/rmml/" + ini_path)
+  let has_controller = false
+  let objects = global.rmml.objects
+  let events = global.rmml.events
+
+  let oi = 0
+  while oi < 6 {
+    let object = objects[oi]
+    if ini_read_string("object_list", object, "") == "enabled" {
+      let header = object + "_events"
+      let ei = 0
+      while ei < 21 {
+        let event = events[ei]
+        let code = ini_read_string(header, event, "")
+        if code != "" {
+          let parsed = global.__catspeak__.parseString(code)
+          let compiled = global.__catspeak__.compile(parsed)
+          if global.rmml.register(object, event, mod_name, compiled) {
+            has_controller = true
+          }
+        }
+        ei += 1
+      }
+    }
+    oi += 1
+  }
+
+  ini_close()
+  return has_controller
+}
+
+-- MARK: Load MD
+-- loads the passed file path as a md mod
+global.rmml.__load_md_path = fun (md_path, mod_name) {
+  let full_buff = buffer_load("mods/rmml/" + md_path)
+
+  let mod_file = file_text_open_read("mods/rmml/" + md_path)
+  let has_controller = false
+  let mod_override = undefined
+  let obj = undefined
+  let event = undefined
+  -- 0: false, 1: default, 2: js parser
+  let code_mode = 0
+  let in_comment = false
+
+  let code_line_number = 0
+  let code_offset = 0
+  let buffer_offset = 0
+  let line_count = 0
+  while !file_text_eof(mod_file) {
+    line_count += 1
+    let raw_line = file_text_readln(mod_file)
+    let line = string(string_trim(raw_line))
+    let line_bytes = string_byte_length(raw_line)
+    buffer_offset += line_bytes
+
+    -- empty lines get skipped if they're not code sections
+    if line == "" and code_mode == 0 {
+      continue
+    }
+
+    -- comment handler
+    if in_comment {
+      if (string_ends_with(line, "-->")) {
+        in_comment = false
+      }
+    -- we're in code mode
+    } else if code_mode != 0 {
+      if string_starts_with(line, "```") {
+        let bf_line_start = buffer_offset - line_bytes
+
+        if global.rmml.dev {
+          -- backfill with newlines (10)
+          buffer_fill(full_buff, code_offset - code_line_number, buffer_u8, 10, code_line_number)
+        } else {
+          code_line_number = 0
+        }
+
+        let parsed = undefined
+
+        -- js needs string replacement before being parsed
+        if code_mode == 2 {
+          -- add null terminator
+          buffer_poke(full_buff, bf_line_start, buffer_u8, 0b0)
+          -- seek read head
+          buffer_seek(full_buff, buffer_seek_start, code_offset - code_line_number)
+          -- rip string
+          let code = buffer_read(full_buff, buffer_string)
+          -- replace js syntax with catspeak syntax
+          code = string_replace_all(code, "function(", "fun(")
+          code = string_replace_all(code, "type(", "typeof(")
+          code = string_replace_all(code, "&&", " and ")
+          code = string_replace_all(code, "||", " or ")
+          code = string_replace_all(code, "//", "--")
+          parsed = global.__catspeak__.parseString(code)
+        } else {
+          parsed = global.__catspeak__.parse(full_buff,
+            -- OFFSET: subtract line number (for new lines)
+            code_offset - code_line_number,
+            -- SIZE: add line number for new lines
+            bf_line_start - code_offset + code_line_number
+          )
+        }
+
+        -- compile and register catspeak
+        let compiled = global.__catspeak__.compile(parsed)
+        if global.rmml.register(obj, event, mod_override, compiled) {
+          has_controller = true
+        }
+
+        -- end of code
+        code_mode = 0
+      }
+    -- h1, either config or an object
+    } else if string_starts_with(line, "# ") {
+      let head = string_split(string_split(line, "# ")[1], " ")
+
+      obj = head[0]
+      mod_override = if array_length(head) > 1 { head[1] } else { mod_name }
+    -- h2, some event handler or a configuration thing
+    } else if string_starts_with(line, "## ") {
+      event = string_split(line, "## ")[1]
+    -- code block
+    } else if string_starts_with(line, "```") {
+      if string_starts_with(line, "```js") {
+        -- javascript
+        code_mode = 2
+      } else {
+        -- catspeak
+        code_mode = 1
+      }
+      code_offset = buffer_offset
+      code_line_number = line_count
+      -- sanity checks
+      if obj == undefined {
+        global.rmml.throw(
+          mod_name + " missing object, " + string(line_count)
+        )
+      } else if event == undefined {
+        global.rmml.throw(
+          mod_name + " missing event, " + string(line_count)
+        )
+      }
+    } else if string_starts_with(line, "<!--") {
+      -- catch one line comments
+      in_comment = !string_ends_with(line, "-->")
+    }
+  }
+
+  file_text_close(mod_file)
+  buffer_delete(full_buff)
+  return has_controller
+}
+
+-- MARK: Load CSV
+-- object event filename ?modname
+global.rmml.__load_csv_path = fun (path, mod_name) {
+  let grid = load_csv("mods/rmml/" + path)
+
+  if ds_grid_width(grid) < 3 {
+    global.rmml.throw(["CSV mod has too few columns", mod_name, path])
+    return
+  }
+  let use_modname = ds_grid_width(grid) > 3
+  let has_controller = false
+
+  let h = ds_grid_height(grid)
+  let y = 0
+  while y < h {
+    if global.rmml.register(
+      -- object
+      ds_grid_get(grid, 0, y),
+      -- event
+      ds_grid_get(grid, 1, y),
+      -- code path
+      global.bootstraps("mods/rmml/" + path + "/" + ds_grid_get(grid, 2, y)),
+      -- mod name
+      if use_modname { ds_grid_get(grid, 3, y) } else { mod_name }
+    ) {
+      has_controller = true
+    }
+    y += 1
+  }
+
+  ds_grid_destroy(grid)
+}
+
+-- MARK: Compile modlist
+global.rmml.__compile_mod_list = fun(list) {
+  if !file_exists(list) {
+    global.rmml.throw("Missing list" + list)
+    return
+  }
+
+  let i = 0
+  let mods = []
+  let f = file_text_open_read(list)
+  while !file_text_eof(f) {
+    let mod_path = string(string_trim(file_text_readln(f)))
+
+    if !string_starts_with(mod_path, "#")
+      and mod_path != ""
+      and mod_path != "rmml.meow"
+    {
+      array_push(mods, mod_path)
+    }
+  }
+  file_text_close(f)
+  return mods
+}
+
+-- MARK: Load file
+-- valid files:
+--   path.md
+--   path.ini
+--   path.meow
+--   thing  -> thing/thing.md or thing/index.md or thing/index.csv
+global.rmml.__load_file = fun (path) {
+  let has_controller
+  let name
+
+  global.rmml.log("LOAD mod " + path)
+  if file_exists("mods/rmml/" + path) {
+    -- /mods/rmml/my_mod.md
+    if string_ends_with(path, ".md") {
+      name = string(string_split(path, ".md")[0])
+      has_controller = global.rmml.__load_md_path(path, name)
+    -- /mods/rmml/old.ini
+    } else if string_ends_with(path, ".ini") {
+      name = string(string_split(path, ".ini")[0])
+      has_controller = global.rmml.__load_ini_path(path, name)
+    -- /mods/rmml/script.meow
+    } else if string_ends_with(path, ".meow") {
+      name = string(string_split(path, ".meow")[0])
+      global.bootstraps("mods/rmml/" + path)()
+    -- /mods/rmml/mod.whatever
+    } else {
+      name = path
+      has_controller = global.rmml.__load_md_path(path, name)
+    }
+  } else if directory_exists("mods/rmml/" + path) {
+    name = path
+    let dir = "mods/rmml/" + path + "/"
+    -- /mods/rmml/my_mod/my_mod.md
+    if file_exists(dir + path + ".md") {
+      has_controller = global.rmml.__load_md_path(path + "/" + path + ".md", name)
+    -- /mods/rmml/my_mod/index.md
+    } else if file_exists(dir + "index.md") {
+      has_controller = global.rmml.__load_md_path(path + "/index.md", name)
+    -- /mods/rmml/my_mod/index.csv
+    } else if file_exists(dir + "index.csv") {
+      has_controller = global.rmml.__load_csv_path(path + "/index.csv", name)
+    } else {
+      global.rmml.throw("Missing " + dir)
+      return
+    }
+  } else {
+    global.rmml.throw("Missing " + path)
+    return
+  }
+
+  -- make controller
+  if has_controller {
+    global.rmml.log("Add controller")
+    let e = global.rmml.try_catch(
+      fun (name) {
+        instance_create_depth(0,0,0, omod_controller, {mod_name: name})
+        return undefined
+      },
+      undefined,
+      name
+    )
+    if e != undefined {
+      global.rmml.throw(["Err loading mod", name, e])
+    }
+  }
+  array_push(global.rmml.mod_list, name)
+  global.rmml.log("END LOAD mod " + name)
+}
+
+-- MARK: Boot loader
+global.rmml.__boot = fun() {
+  -- loading music
+  let loading_music = audio_play_sound(snd_music_tea_party, 0, true, 1)
+
+  -- disable runtime limit
+  let s = method_get_self(ds_map_find_value(global.mod_map,"controller_events_create"))
+  s.callTime = infinity
+  s = method_get_self(global.rmml.__boot)
+  s.callTime = infinity
+
+  -- catch mod loading errors
+  global.rmml.__catch = true
+
+  -- clear volatile rmml globals
+  global.rmml_current_mod = "rmml"
+  global.rmml_map = {}
+  global.rmml.errors = ""
+  global.rmml.mod_list = []
+
+  global.rmml.log("--- Load Mods ---")
+
+  -- replace existing mod map code
+  let quick_create = ds_map_find_value(global.mod_map, "basic_events_create")
+  ds_map_set(global.mod_map, "enemy_events_create", quick_create)
+  ds_map_set(global.mod_map, "controller_events_create", quick_create)
+  ds_map_set(global.mod_map, "hitbox_events_create", quick_create)
+  ds_map_set(global.mod_map, "instance_events_create", quick_create)
+  ds_map_set(global.mod_map, "player_events_create", quick_create)
+  -- delete initial controller
+  instance_destroy(omod_controller)
+
+  -- load the mod list
+  let mods = global.rmml.__compile_mod_list("mods/modlist.txt")
+
+  -- load each mod on the list
+  let i = 0
+  while i < array_length(mods) {
+    global.rmml.__load_file(mods[i])
+    i += 1
+  }
+
+  global.rmml.log(["rm map", json_encode(global.mod_map)])
+  global.rmml.log(["rmml map", global.rmml_map])
+  global.rmml.__catch = false
+  audio_stop_sound(loading_music)
+}
+
+global.rmml.clear()
+global.rmml.log("RMML LOADED")

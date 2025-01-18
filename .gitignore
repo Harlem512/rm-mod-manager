@@ -1,3 +1,9 @@
 __pycache__
 .vscode
 build/
+dist/
+# don't distribute catspeak's tokenizer
+# get from here https://github.com/katsaii/catspeak-lang/blob/06734ff95ae947d1fd2ba677a061c3c24725e529/docs-gen/catlog/highlight.py
+highlight.py
+# built mods
+*.zip

@@ -1,0 +1,16 @@
+-- bootstrap loader function
+if !global.bootstraps {
+  global.bootstraps = fun (filename) {
+    let buff = buffer_load(filename)
+    let parsed = global.__catspeak__.parse(buff)
+    buffer_delete(buff)
+    global.__catspeak__.compile(parsed)
+  }
+}
+-- load RMML, if we haven't already
+if !global.rmml {
+  global.bootstraps("mods/rmml/rmml.meow")()
+}
+
+-- Boot RMML
+global.rmml.__boot()
