@@ -13,9 +13,9 @@ global.rmml_map = {}
 -- MARK: DATA
 global.rmml = {
   -- internal version number
-  version: 5.41,
+  version: 5.42,
   -- enables developer features
-  dev: true,
+  dev: false,
 
   -- rmml's mod list, stored as mod names names
   mod_list: [],
@@ -139,6 +139,18 @@ global.rmml.__HIR_path = [
 ]
 
 global.rmml.register = fun (object, event, mod, fn) {
+  if
+    (object == undefined and event == undefined)
+    or (object == "" and event == "")
+  {
+    if !global.rmml.__mod_set[mod] {
+      global.rmml.log(["Game start for", mod])
+      fn()
+      global.rmml.__mod_set[mod] = true
+    }
+    return
+  }
+
   -- build event key
   let o_index = __scribble_array_find_index(global.rmml.objects, object)
   let e_index = __scribble_array_find_index(global.rmml.events, event)
@@ -155,7 +167,7 @@ global.rmml.register = fun (object, event, mod, fn) {
   -- create RM mod_map entry
   if !global.rmml_map[ev_key] {
     -- pick which of the three HIR to use
-    let index = (o_index == 3) + (e_index == 0) << 1
+    let index = (o_index == 3) + (e_index == 0) * 2
     -- get hir
     let hir = global.rmml.__HIR[index]
     -- update event key through HIR injection
@@ -250,7 +262,7 @@ global.rmml.__load_md_path = fun (md_path, mod_name) {
 
   let mod_file = file_text_open_read("mods/rmml/" + md_path)
   let has_controller = false
-  let mod_override = undefined
+  let mod_override = mod_name
   let obj = undefined
   let event = undefined
   -- 0: false, 1: default, 2: js parser
@@ -318,32 +330,20 @@ global.rmml.__load_md_path = fun (md_path, mod_name) {
 
         -- compile and register catspeak
         let compiled = global.__catspeak__.compile(parsed)
-        -- game start code fence
-        if
-          obj == undefined
-          and event == undefined
-        {
-          if !global.rmml.__mod_set[mod_name] {
-            global.rmml.log(["Game start for", mod_name])
-            compiled()
-            global.rmml.__mod_set[mod_name] = true
-          }
-        } else {
-          if global.rmml.register(obj, event, mod_override, compiled) {
-            has_controller = true
-          }
+        if global.rmml.register(obj, event, mod_override, compiled) {
+          has_controller = true
         }
 
         -- end of code
         code_mode = 0
       }
-    -- h1, either config or an object
+    -- h1, an object
     } else if string_starts_with(line, "# ") {
       let head = string_split(string_split(line, "# ")[1], " ")
 
       obj = head[0]
       mod_override = if array_length(head) > 1 { head[1] } else { mod_name }
-    -- h2, some event handler or a configuration thing
+    -- h2, some event handler
     } else if string_starts_with(line, "## ") {
       event = string_split(line, "## ")[1]
     -- code block
@@ -373,26 +373,48 @@ global.rmml.__load_md_path = fun (md_path, mod_name) {
 global.rmml.__load_csv_path = fun (path, mod_name) {
   let grid = load_csv("mods/rmml/" + path)
 
+  if !grid or !ds_exists(grid, ds_type_grid) {
+    global.rmml.warn(["csv mod could not be loaded", mod_name, path])
+    return
+  }
+
   if ds_grid_width(grid) < 3 {
     global.rmml.warn(["CSV mod has too few columns", mod_name, path])
     ds_grid_destroy(grid)
     return
   }
+
   let use_modname = ds_grid_width(grid) > 3
   let has_controller = false
 
   let h = ds_grid_height(grid)
   let y = 0
   while y < h {
+    let path = "mods/rmml/" + mod_name + "/" + string(ds_grid_get(grid, 2, y))
+
+    if !file_exists(path) {
+      global.rmml.warn(["CSV mod path missing", path, y])
+      y += 1
+      continue
+    }
+
+    let name = mod_name
+    if use_modname {
+      let get = ds_grid_get(grid, 3, y)
+      if get != undefined and get != 0 {
+        name = get
+      }
+    }
+
     if global.rmml.register(
       -- object
       ds_grid_get(grid, 0, y),
       -- event
       ds_grid_get(grid, 1, y),
-      -- code path -> load function
-      global.bootstraps("mods/rmml/" + path + "/" + ds_grid_get(grid, 2, y)),
       -- mod name
-      if use_modname { ds_grid_get(grid, 3, y) } else { mod_name }
+      name,
+      -- code path -> load function
+      global.bootstraps(path),
     ) {
       has_controller = true
     }
@@ -400,6 +422,7 @@ global.rmml.__load_csv_path = fun (path, mod_name) {
   }
 
   ds_grid_destroy(grid)
+  return has_controller
 }
 
 -- MARK: Compile modlist
@@ -478,7 +501,7 @@ global.rmml.__load_file = fun (path) {
 
   -- make controller
   if has_controller {
-    global.rmml.log("Add controller")
+    global.rmml.log(["Add controller", name])
     let e = global.rmml.try_catch(
       fun (name) {
         instance_create_depth(0,0,0, omod_controller, {mod_name: name})

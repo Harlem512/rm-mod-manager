@@ -3,22 +3,24 @@ from highlight import *
 from more_itertools import peekable
 import re
 import shutil
+import zipfile
 
 
-def minify(code: str, max_width=4090, purgeLogs=False, replaceQuotes=False):
+def post_process(code: str, minify=False, max_width=4090, purgeLogs=False, replaceQuotes=False):
     if purgeLogs:
         code = re.sub(r'global\.rmml\.log\(.+\)', '', code)
 
-    final = untokenize(strip_whitespace(tokenise_meow(code)), max_width)
+    if minify:
+        code = untokenize(strip_whitespace(tokenise_meow(code)), max_width)
 
     if replaceQuotes:
-        final = re.sub(
-            r"'.'", lambda match: f'ord("{match.group(0)[1]}")', final
+        code = re.sub(
+            r"'.'", lambda match: f'ord("{match.group(0)[1]}")', code
         )
-        if "'" in final:
+        if "'" in code:
             raise SyntaxError("Code contains unclosed single quotes", code)
 
-    return final
+    return code
 
 
 def strip_whitespace(
@@ -113,7 +115,7 @@ def untokenize(
 
 if __name__ == "__main__":
     with open("src/init.meow") as f:
-        create = minify(f.read(), purgeLogs=True, replaceQuotes=True)
+        create = post_process(f.read(), minify=True, purgeLogs=True, replaceQuotes=True)
         pass
 
     with open("build/rmml.ini", 'w') as f:
@@ -141,8 +143,8 @@ if __name__ == "__main__":
 
     with open("src/rmml.meow") as f:
         raw = f.read()
-        rmml_version = raw.splitlines()[2][22:].replace('.', '_')
-        rmml_src = minify(raw, purgeLogs=True, replaceQuotes=False)
+        rmml_version = raw.splitlines()[15][11:-1].replace('.', '_')
+        rmml_src = post_process(raw, purgeLogs=True)
 
     with open("build/rmml.meow", 'w') as f:
         f.write(rmml_src)
@@ -157,5 +159,20 @@ if __name__ == "__main__":
             ]
         )
     
-    shutil.copyfile("build/rmml.ini", "D:\\SteamLibrary\\steamapps\\common\\Mose\\mods\\rmml.ini")
-    shutil.copyfile("build/rmml.meow", "D:\\SteamLibrary\\steamapps\\common\\Mose\\mods\\rmml\\rmml.meow")
+    # shutil.copyfile("build/rmml.ini", "D:\\SteamLibrary\\steamapps\\common\\Mose\\mods\\rmml.ini")
+    # shutil.copyfile("build/rmml.meow", "D:\\SteamLibrary\\steamapps\\common\\Mose\\mods\\rmml\\rmml.meow")
+
+    # package rmml
+    with zipfile.ZipFile(
+        f'dist/rmml_{rmml_version}.zip', 'w', zipfile.ZIP_DEFLATED
+    ) as package:
+        package.write("build/meta_info.ini", "meta_info.ini")
+        package.write("build/modlist.txt", "modlist.txt")
+        package.write("build/rmml.ini", "rmml.ini")
+
+        package.write("src/rmmm.md", "rmml/rmmm.md")
+        package.write("build/rmml.meow", "rmml/rmml.meow")
+    
+    # package rmml and rmmm
+    shutil.copyfile("build/rmml.meow", "dist/rmml.meow")
+    shutil.copyfile("src/rmmm.md", "dist/rmmm.md")
