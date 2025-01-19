@@ -1,12 +1,66 @@
 Rusted Moss Mod Manager
 
+```sp
+global.component = {
+  click_inside: fun (x,y, w,h) {
+    return mouse_check_button_pressed(mb_left)
+      and point_in_rectangle(global.mousex, global.mousey,
+        x, y,
+        x + w, y + h)
+  },
+  label: fun (x, y, w, h, text, hover, hover_text) {
+    let pin = if hover {
+      point_in_rectangle(global.mousex, global.mousey,
+        x, y,
+        x + w, y + h
+      )
+    }
+
+    draw_sprite_stretched_ext(sui_9slice, 0, x, y, w, h,
+      if pin {c_ltgray} else {c_white}, 1)
+    if text != undefined {
+      draw_text(x + 6, y + 6, text)
+    }
+
+    -- tool tip in bottom right
+    if pin and hover_text != undefined {
+      global.component.label(2, 226,
+        string_length(hover_text) * 6 + 24, 22,
+        hover_text)
+    }
+
+    return pin
+  },
+  button: fun (x, y, w, h, text, hover_text) {
+    let click = global.component.label(x, y, w, h, text, true, hover_text)
+        and mouse_check_button_pressed(mb_left)
+
+    if click {
+      audio_play_sound_volume(snd_menu_1, 1, 1)
+    }
+
+    return click
+  },
+}
+
+-- parse json
+global.parse_json_file = fun (filename) {
+  return global.rmml.try_catch(fun (filename) {
+    b = buffer_load(filename)
+    s = buffer_read(b, buffer_string)
+    buffer_delete(b)
+    return json_parse(s)
+  }, undefined, filename)
+}
+```
+
 # controller
 
 ## create
 
 ```sp
 -- RMMM version
-self.version = 0
+self.version = 0.1
 -- manifest url
 -- DEBUG: test server
 self.manifest_url = "http://127.0.0.1:8080/manifest.json"
@@ -68,7 +122,7 @@ self.cache_local = fun () {
   if file_exists(self.manifest_file) {
     raw_manifest = global.parse_json_file(self.manifest_file)
     if !raw_manifest {
-      global.rmml.errors += "| Parsing error with local manifest, resetting"
+      global.rmml.warnings += "| Parsing error with local manifest, resetting"
       file_delete(self.manifest_file)
       raw_manifest = {}
     }
@@ -97,6 +151,7 @@ self.cache_local = fun () {
   -- rebuild the local manifest, based on what's actually installed
   self.local_manifest = {}
   let local_mods = []
+  -- 16: include directories
   let mod = file_find_first("mods/rmml/*", 16)
   while mod != "" {
     array_push(local_mods, mod)
@@ -165,63 +220,6 @@ self.cache_local = fun () {
   }
 }
 
--- -----------------------------------------------------------------------------
---                            "component" "library"                             
--- -----------------------------------------------------------------------------
-if !global.component {
-  global.component = {
-    click_inside: fun (x,y, w,h) {
-      return mouse_check_button_pressed(mb_left)
-        and point_in_rectangle(global.mousex, global.mousey,
-          x, y,
-          x + w, y + h)
-    },
-    label: fun (x, y, w, h, text, hover, hover_text) {
-      let pin = if hover {
-        point_in_rectangle(global.mousex, global.mousey,
-          x, y,
-          x + w, y + h
-        )
-      }
-
-      draw_sprite_stretched_ext(sui_9slice, 0, x, y, w, h,
-        if pin {c_ltgray} else {c_white}, 1)
-      if text != undefined {
-        draw_text(x + 6, y + 6, text)
-      }
-
-      -- tool tip in bottom right
-      if pin and hover_text != undefined {
-        global.component.label(2, 226,
-          string_length(hover_text) * 6 + 24, 22,
-          hover_text)
-      }
-
-      return pin
-    },
-    button: fun (x, y, w, h, text, hover_text) {
-      let click = global.component.label(x, y, w, h, text, true, hover_text)
-          and mouse_check_button_pressed(mb_left)
-
-      if click {
-        audio_play_sound_volume(snd_menu_1, 1, 1)
-      }
-
-      return click
-    },
-  }
-
-  -- parse json
-  global.parse_json_file = fun (filename) {
-    return global.rmml.try_catch(fun (filename) {
-      b = buffer_load(filename)
-      s = buffer_read(b, 11)
-      buffer_delete(b)
-      return json_parse(s)
-    }, undefined, filename)
-  }
-}
-
 self.save_mods = fun () {
   let list = file_text_open_write("mods/modlist.txt")
   file_text_write_string(list, "# put your mods here (or disable them with #)\n# mods are loading (and run) in the order written here\n# this file is also managed by RMMM\n")
@@ -246,14 +244,16 @@ self.save_manifest = fun () {
 }
 
 -- crash safety valve
-if file_exists("mods/back.modlist.txt") and !global.rmml.dev {
-  global.rmml.errors += "| Startup crash detected, disabled mods"
-  file_delete("mods/modlist.txt")
-  -- file_delete("mods/back.modlist.txt")
-}
-file_rename("mods/modlist.txt", "mods/back.modlist.txt")
+if !global.rmml.dev {
+  if file_exists("mods/back.modlist.txt") {
+    global.rmml.warnings += "| Startup crash detected, disabled mods"
+    file_delete("mods/modlist.txt")
+    -- file_delete("mods/back.modlist.txt")
+  }
+  file_rename("mods/modlist.txt", "mods/back.modlist.txt")
 
-alarm_set(0, 10)
+  alarm_set(0, 10)
+}
 ```
 
 ## alarm_0
@@ -316,7 +316,7 @@ if self.state == 0 {
     self.cache_local()
   }
   draw_sprite_ext(smenu_bar,1, 429,13, 1,1, 0,
-    if global.rmml.errors != "" { c_red } else { c_black }, 1
+    if global.rmml.warnings != "" { c_red } else { c_black }, 1
   )
 
   -- ---------------------------------------------------------------------------
@@ -633,14 +633,13 @@ if self.state == 0 {
         if mod_meta._downloading {
           let f = self.directory(mod_meta.name)
           if file_exists(f) {
+            -- delete old mod
+            directory_destroy("mods/rmml/" + mod_meta.name)
+            file_delete("mods/rmml/" + mod_meta.name)
             if mod_meta.type == "zip" {
-              -- delete old mod
-              directory_destroy("mods/rmml/" +mod_meta.name)
               -- unzip
               zip_unzip(f, "mods/rmml")
             } else {
-              -- delete old mod
-              file_delete("mods/rmml/" +mod_meta.name)
               -- copy
               file_copy(f, "mods/rmml/" + mod_meta.name)
             }
@@ -726,22 +725,22 @@ if self.state == 0 {
   -- ---------------------------------------------------------------------------
 
   -- bottom bar
-  if global.rmml.errors != "" {
-    -- render rmml errors
+  if global.rmml.warnings != "" {
+    -- render rmml warnings
     if global.component.button(
       2, 226, 440, 22,
-      global.rmml.errors,
+      global.rmml.warnings,
     ) {
-      show_message(string_replace_all(global.rmml.errors, "|", "\n"))
+      show_message(string_replace_all(global.rmml.warnings, "|", "\n"))
     }
   } else {
     -- version info
-    draw_sprite_stretched(sui_9slice, 0, 382, 226, 60, 22)
-    draw_text(388, 232, "rmml " + string(global.rmml.version))
+    draw_sprite_stretched(sui_9slice, 0, 376, 226, 66, 22)
+    draw_text(382, 232, "rmml " + string(global.rmml.version))
 
     -- delete all mods
     if global.component.button(
-      308, 226, 72, 22,
+      302, 226, 72, 22,
       "Reset RMMM",
     ) {
       next_state = -3
@@ -750,7 +749,7 @@ if self.state == 0 {
     -- game folder
     off = (self.state == 4) * 7
     if global.component.button(
-      228, 226 - off, 78, 22 + off
+      222, 226 - off, 78, 22 + off
       "Game Folder",
     ) {
       next_state = 4
@@ -759,7 +758,7 @@ if self.state == 0 {
     -- save folder
     off = (self.state == 5) * 7
     if global.component.button(
-      148, 226 - off, 78, 22 + off
+      142, 226 - off, 78, 22 + off
       "Save Folder",
     ) {
       next_state = 5
