@@ -63,8 +63,8 @@ global.parse_json_file = fun (filename) {
 self.version = 0.1
 -- manifest url
 -- DEBUG: test server
-self.manifest_url = "http://127.0.0.1:8080/manifest.json"
--- self.manifest_url = ""
+-- self.manifest_url = "http://127.0.0.1:8080/manifest.json"
+self.manifest_url = "https://raw.githubusercontent.com/Harlem512/rm-mod-database/refs/heads/main/manifest.json"
 
 self.manifest_file = "mods/rmmm/manifest.json"
 self.depth = 0
@@ -110,7 +110,7 @@ self.transform_foreign_manifest = fun () {
 
 -- temporary downloads
 self.directory = fun (file) {
-  return temp_directory_get() + "/rmmm/" + file
+  return temp_directory_get() + "rmmm/" + file
 }
 
 -- -----------------------------------------------------------------------------
@@ -484,7 +484,7 @@ if self.state == 0 {
       if file_exists(f) {
         self.downloading_manifest = false
         self.foreign_manifest = global.parse_json_file(f)
-        if !self.foreign_manifest {
+        if !is_struct(self.foreign_manifest) {
           global.rmml.throw("There was an error parsing\nthe foreign manifest\nPlease contact Harlem512 or try again later")
         }
         self.transform_foreign_manifest()
