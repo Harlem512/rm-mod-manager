@@ -60,7 +60,7 @@ global.parse_json_file = fun (filename) {
 
 ```sp
 -- RMMM version
-self.version = 0.1
+self.version = 0.21
 -- manifest url
 -- DEBUG: test server
 -- self.manifest_url = "http://127.0.0.1:8080/manifest.json"
@@ -246,7 +246,7 @@ self.save_manifest = fun () {
 -- crash safety valve
 if !global.rmml.dev {
   if file_exists("mods/back.modlist.txt") {
-    global.rmml.warnings += "| Startup crash detected, disabled mods"
+    global.rmml.warn("Startup crash detected, disabled mods")
     file_delete("mods/modlist.txt")
     -- file_delete("mods/back.modlist.txt")
   }
@@ -271,6 +271,7 @@ let menu = instance_find(omenu_new)
 -- unload this mod when we're loading a new save
 if !menu or menu.state == 8 {
   global.rmml.unload()
+  file_rename("mods/back.modlist.txt", "mods/modlist.txt")
   return
 }
 
@@ -475,6 +476,14 @@ if self.state == 0 {
     }
   }
 
+    -- current mods tab
+  if global.component.button(
+    209, 2, 78, 22,
+    "View Online",
+  ) {
+    url_open("https://github.com/Harlem512/rm-mod-database")
+  }
+
   if self.state == 3 {
     -- -------------------------------------------------------------------------
     --                            download manifest
@@ -645,6 +654,11 @@ if self.state == 0 {
             }
             -- delete download
             file_delete(f)
+            -- check if mods bricked themselves
+            if file_exists("/mods/rmml") {
+              global.rmml.warn("rmml folder bricked")
+              file_delete("/mods/rmml")
+            }
             -- unmark deleted
             mod_meta._downloading = false
             self.downloading_mod = false

@@ -13,7 +13,7 @@ global.rmml_map = {}
 -- MARK: DATA
 global.rmml = {
   -- internal version number
-  version: 5.42,
+  version: 5.43,
   -- enables developer features
   dev: false,
 
@@ -145,7 +145,10 @@ global.rmml.register = fun (object, event, mod, fn) {
   {
     if !global.rmml.__mod_set[mod] {
       global.rmml.log(["Game start for", mod])
+      let cur = global.rmml_current_mod
+      global.rmml_current_mod = mod
       fn()
+      global.rmml_current_mod = cur
       global.rmml.__mod_set[mod] = true
     }
     return
@@ -293,6 +296,12 @@ global.rmml.__load_md_path = fun (md_path, mod_name) {
     -- we're in code mode
     } else if code_mode != 0 {
       if string_starts_with(line, "```") {
+        --  skip parsing the file, since we've already run the startup
+        if obj == undefined and event == undefined and global.rmml.__mod_set[mod_override] {
+          code_mode = 0
+          continue
+        }
+
         let bf_line_start = buffer_offset - line_bytes
 
         if global.rmml.dev {
@@ -406,16 +415,15 @@ global.rmml.__load_csv_path = fun (path, mod_name) {
       }
     }
 
-    if global.rmml.register(
-      -- object
-      ds_grid_get(grid, 0, y),
-      -- event
-      ds_grid_get(grid, 1, y),
-      -- mod name
-      name,
-      -- code path -> load function
-      global.bootstraps(path),
-    ) {
+    let obj = ds_grid_get(grid, 0, y)
+    let event = ds_grid_get(grid, 1, y)
+
+    if obj == "" and event == "" and global.rmml.__mod_set[name] {
+      y += 1
+      continue
+    }
+
+    if global.rmml.register(obj, event, name, global.bootstraps(path)) {
       has_controller = true
     }
     y += 1
