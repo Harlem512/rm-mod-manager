@@ -13,7 +13,7 @@ global.rmml_map = {}
 -- MARK: DATA
 global.rmml = {
   -- internal version number
-  version: 5.43,
+  version: 5.44,
   -- enables developer features
   dev: false,
 
@@ -480,7 +480,10 @@ global.rmml.__load_file = fun (path) {
     -- /mods/rmml/script.meow
     } else if string_ends_with(path, ".meow") {
       name = string(string_split(path, ".meow")[0])
+      let c = global.rmml_current_mod
+      global.rmml_current_mod = name
       global.bootstraps("mods/rmml/" + path)()
+      global.rmml_current_mod = c
     -- /mods/rmml/mod.whatever
     } else {
       name = path
