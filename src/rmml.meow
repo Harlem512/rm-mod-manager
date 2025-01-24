@@ -13,7 +13,7 @@ global.rmml_map = {}
 -- MARK: DATA
 global.rmml = {
   -- internal version number
-  version: 5.44,
+  version: 5.45,
   -- enables developer features
   dev: false,
 
@@ -64,6 +64,8 @@ global.rmml = {
     -- crash the game in dev mode
     if global.rmml.dev {
       global.rmml.throw(msg)
+    } else {
+      global.rmml.log (["WARN::", msg])
     }
   },
 
@@ -79,6 +81,15 @@ global.rmml = {
   -- set of all mods that have been loaded. used by rmml for game_start event
   -- this is not reset when the mods are reloaded
   __mod_set: {},
+  -- list of all mods that need controllers
+  __mod_controllers: {},
+  -- quick-create event code, sets self.mod_name and returns
+  __quick_create: ds_map_find_value(global.mod_map, "basic_events_create"),
+  -- cached mod maps, for quicker mod loading on return to menu
+  -- rm's cache of `global.mod_map`, a ds_map
+  __mod_map_cache: undefined,
+  -- rmml's cache of `global.rmml_map`, a struct
+  __rmml_mod_map_cache: undefined,
 }
 
 -- MARK: Try-Catch
@@ -89,9 +100,29 @@ global.rmml.try_catch = function (_try, _catch, a,b,c,d,e,f,g,h) {
   } catch (err) {
     return _catch ? _catch(err) : err
   }
-}
-"))
+}"))
 
+-- MARK: Shallow Clone
+-- clones a struct of structs
+global.rmml.clone = fun (struct) {
+  let new_struct = {}
+  let event_names = variable_struct_get_names(struct)
+  let event_index = array_length(event_names) - 1
+  while event_index >= 0  {
+    let event = event_names[event_index]
+    -- add new struct
+    new_struct[event] = {}
+    let mod_names = variable_struct_get_names(struct[event])
+    let mod_index = array_length(mod_names) - 1
+    while mod_index >= 0 {
+      let mod = mod_names[mod_index]
+      new_struct[event][mod] = struct[event][mod]
+      mod_index -= 1
+    }
+    event_index -= 1
+  }
+  return new_struct
+}
 
 -- MARK: Register
 let raw_code_normal = "
@@ -190,8 +221,11 @@ global.rmml.register = fun (object, event, mod, fn) {
   global.rmml.log(["Registered Event", ev_key, mod])
   global.rmml_map[ev_key][mod] = fn
 
-  -- return true since we need a controller
-  return o_index == 0
+  -- check if we need to add a controller
+  if o_index == 0 and !global.rmml.__mod_controllers[mod] {
+    global.rmml.log(["Need to add controller for",  mod])
+    global.rmml.__mod_controllers[mod] = true
+  }
 }
 
 -- MARK: Unload
@@ -228,7 +262,6 @@ global.rmml.unload = fun (mod_name) {
 -- loads the passed file path as an ini mod
 global.rmml.__load_ini_path = fun (ini_path, mod_name) {
   ini_open("mods/rmml/" + ini_path)
-  let has_controller = false
   let objects = global.rmml.objects
   let events = global.rmml.events
 
@@ -244,9 +277,7 @@ global.rmml.__load_ini_path = fun (ini_path, mod_name) {
         if code != "" {
           let parsed = global.__catspeak__.parseString(code)
           let compiled = global.__catspeak__.compile(parsed)
-          if global.rmml.register(object, event, mod_name, compiled) {
-            has_controller = true
-          }
+          global.rmml.register(object, event, mod_name, compiled)
         }
         ei += 1
       }
@@ -255,7 +286,6 @@ global.rmml.__load_ini_path = fun (ini_path, mod_name) {
   }
 
   ini_close()
-  return has_controller
 }
 
 -- MARK: Load MD
@@ -264,7 +294,6 @@ global.rmml.__load_md_path = fun (md_path, mod_name) {
   let full_buff = buffer_load("mods/rmml/" + md_path)
 
   let mod_file = file_text_open_read("mods/rmml/" + md_path)
-  let has_controller = false
   let mod_override = mod_name
   let obj = undefined
   let event = undefined
@@ -339,9 +368,7 @@ global.rmml.__load_md_path = fun (md_path, mod_name) {
 
         -- compile and register catspeak
         let compiled = global.__catspeak__.compile(parsed)
-        if global.rmml.register(obj, event, mod_override, compiled) {
-          has_controller = true
-        }
+        global.rmml.register(obj, event, mod_override, compiled)
 
         -- end of code
         code_mode = 0
@@ -374,7 +401,6 @@ global.rmml.__load_md_path = fun (md_path, mod_name) {
 
   file_text_close(mod_file)
   buffer_delete(full_buff)
-  return has_controller
 }
 
 -- MARK: Load CSV
@@ -394,7 +420,6 @@ global.rmml.__load_csv_path = fun (path, mod_name) {
   }
 
   let use_modname = ds_grid_width(grid) > 3
-  let has_controller = false
 
   let h = ds_grid_height(grid)
   let y = 0
@@ -423,14 +448,11 @@ global.rmml.__load_csv_path = fun (path, mod_name) {
       continue
     }
 
-    if global.rmml.register(obj, event, name, global.bootstraps(path)) {
-      has_controller = true
-    }
+    global.rmml.register(obj, event, name, global.bootstraps(path))
     y += 1
   }
 
   ds_grid_destroy(grid)
-  return has_controller
 }
 
 -- MARK: Compile modlist
@@ -464,7 +486,6 @@ global.rmml.__compile_mod_list = fun(list) {
 --   path.meow
 --   thing  -> thing/thing.md or thing/index.md or thing/index.csv
 global.rmml.__load_file = fun (path) {
-  let has_controller
   let name
 
   global.rmml.log("LOAD mod " + path)
@@ -472,11 +493,11 @@ global.rmml.__load_file = fun (path) {
     -- /mods/rmml/my_mod.md
     if string_ends_with(path, ".md") {
       name = string(string_split(path, ".md")[0])
-      has_controller = global.rmml.__load_md_path(path, name)
+      global.rmml.__load_md_path(path, name)
     -- /mods/rmml/old.ini
     } else if string_ends_with(path, ".ini") {
       name = string(string_split(path, ".ini")[0])
-      has_controller = global.rmml.__load_ini_path(path, name)
+      global.rmml.__load_ini_path(path, name)
     -- /mods/rmml/script.meow
     } else if string_ends_with(path, ".meow") {
       name = string(string_split(path, ".meow")[0])
@@ -487,20 +508,20 @@ global.rmml.__load_file = fun (path) {
     -- /mods/rmml/mod.whatever
     } else {
       name = path
-      has_controller = global.rmml.__load_md_path(path, name)
+      global.rmml.__load_md_path(path, name)
     }
   } else if directory_exists("mods/rmml/" + path) {
     name = path
     let dir = "mods/rmml/" + path + "/"
     -- /mods/rmml/my_mod/my_mod.md
     if file_exists(dir + path + ".md") {
-      has_controller = global.rmml.__load_md_path(path + "/" + path + ".md", name)
+      global.rmml.__load_md_path(path + "/" + path + ".md", name)
     -- /mods/rmml/my_mod/index.md
     } else if file_exists(dir + "index.md") {
-      has_controller = global.rmml.__load_md_path(path + "/index.md", name)
+      global.rmml.__load_md_path(path + "/index.md", name)
     -- /mods/rmml/my_mod/index.csv
     } else if file_exists(dir + "index.csv") {
-      has_controller = global.rmml.__load_csv_path(path + "/index.csv", name)
+      global.rmml.__load_csv_path(path + "/index.csv", name)
     } else {
       global.rmml.warn("Missing " + dir)
       return
@@ -510,23 +531,40 @@ global.rmml.__load_file = fun (path) {
     return
   }
 
-  -- make controller
-  if has_controller {
-    global.rmml.log(["Add controller", name])
-    let e = global.rmml.try_catch(
-      fun (name) {
-        instance_create_depth(0,0,0, omod_controller, {mod_name: name})
-        return undefined
-      },
-      undefined,
-      name
-    )
-    if e != undefined {
-      global.rmml.warn(["Err loading mod", name, e])
-    }
-  }
   array_push(global.rmml.mod_list, name)
   global.rmml.log("END LOAD mod " + name)
+}
+
+-- MARK: Add Controllers
+-- adds a controller for each mod that needs one
+global.rmml.__add_controllers = fun () {
+  let ar = variable_struct_get_names(global.rmml.__mod_controllers)
+  let n = array_length(ar)
+  let i = 0
+  while i < n {
+    global.rmml.log(["ADDING controller for", ar[i]])
+    if global.rmml.dev {
+      -- dev mode, no try-catch
+      instance_create_depth(0,0,0, omod_controller, {
+        mod_name: ar[i]
+      })
+    } else {
+      -- wrap in a try-catch to (hopefully) prevent startup crashes
+      let e = global.rmml.try_catch(
+        fun (name) {
+          instance_create_depth(0,0,0, omod_controller, {mod_name: name})
+          return undefined
+        },
+        undefined,
+        ar[i]
+      )
+
+      if e != undefined {
+        global.rmml.warn(["Err loading mod", name, e])
+      }
+
+    i += 1
+  }
 }
 
 -- MARK: Boot loader
@@ -540,23 +578,52 @@ global.rmml.__boot = fun() {
   s = method_get_self(global.rmml.__boot)
   s.callTime = infinity
 
-  -- clear volatile rmml globals
+  -- blow up omod_meta and initial controller
+  instance_destroy(omod_meta)
+  instance_destroy(omod_controller)
+
+  -- free the global mod map (just in case)
+  ds_map_delete(global.mod_map)
+  -- free the old mod_map
+  if global.__mod_map_old {
+    ds_map_delete(global.__mod_map_old)
+  }
+  -- create a new mod_map
+  global.mod_map = ds_map_create()
+  global.__mod_map_old = global.mod_map
+
+  -- clear volatile rmml globals (uncached)
   global.rmml_current_mod = "rmml"
-  global.rmml_map = {}
   global.rmml.warnings = ""
+
+  -- cache exists, load cache data
+  if global.rmml.__mod_map_cache {
+    global.rmml.log("Cached, skipping loading")
+    ds_map_copy(global.mod_map, global.rmml.__mod_map_cache)
+    global.rmml_map = global.rmml.clone(global.rmml.__rmml_mod_map_cache)
+
+    global.rmml.__add_controllers()
+    global.rmml.log(["controller count", instance_number(omod_controller)])
+    global.rmml.log(global.rmml_map)
+    global.rmml.log(json_encode(global.mod_map))
+    audio_stop_sound(loading_music)
+    return
+  }
+
+  -- clear volatile rmml globals (cached)
+  global.rmml_map = {}
   global.rmml.mod_list = []
 
   global.rmml.log("--- Load Mods ---")
 
-  -- replace existing mod map code
-  let quick_create = ds_map_find_value(global.mod_map, "basic_events_create")
+  -- add quick create events
+  let quick_create = global.rmml.__quick_create
   ds_map_set(global.mod_map, "enemy_events_create", quick_create)
   ds_map_set(global.mod_map, "controller_events_create", quick_create)
   ds_map_set(global.mod_map, "hitbox_events_create", quick_create)
   ds_map_set(global.mod_map, "instance_events_create", quick_create)
   ds_map_set(global.mod_map, "player_events_create", quick_create)
-  -- delete initial controller
-  instance_destroy(omod_controller)
+  ds_map_set(global.mod_map, "basic_events_create", quick_create)
 
   -- load the mod list
   let mods = global.rmml.__compile_mod_list("mods/modlist.txt")
@@ -567,6 +634,16 @@ global.rmml.__boot = fun() {
     global.rmml.__load_file(mods[i])
     i += 1
   }
+
+  -- cache mod maps
+  if !global.rmml.dev {
+    global.rmml.__mod_map_cache = ds_map_create()
+    ds_map_copy(global.rmml.__mod_map_cache, global.mod_map)
+    global.rmml.__rmml_mod_map_cache = global.rmml.clone(global.rmml_map)
+  }
+  
+  -- add controllers
+  global.rmml.__add_controllers()
 
   global.rmml.log(["rm map", json_encode(global.mod_map)])
   global.rmml.log(["rmml map", global.rmml_map])
