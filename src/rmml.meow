@@ -325,12 +325,6 @@ global.rmml.__load_md_path = fun (md_path, mod_name) {
     -- we're in code mode
     } else if code_mode != 0 {
       if string_starts_with(line, "```") {
-        --  skip parsing the file, since we've already run the startup
-        if obj == undefined and event == undefined and global.rmml.__mod_set[mod_override] {
-          code_mode = 0
-          continue
-        }
-
         let bf_line_start = buffer_offset - line_bytes
 
         if global.rmml.dev {
@@ -424,12 +418,21 @@ global.rmml.__load_csv_path = fun (path, mod_name) {
   let h = ds_grid_height(grid)
   let y = 0
   while y < h {
-    let path = "mods/rmml/" + mod_name + "/" + string(ds_grid_get(grid, 2, y))
+    let path = string(ds_grid_get(grid, 2, y))
+    let code = if string_starts_with(path, "do {") {
+      -- returned, inline code
+      global.__catspeak__.compile(global.__catspeak__.parseString(path))
+    } else {
+      let full_path = "mods/rmml/" + mod_name + "/" + path
 
-    if !file_exists(path) {
-      global.rmml.warn(["CSV mod path missing", path, y])
-      y += 1
-      continue
+      if !file_exists(full_path) {
+        global.rmml.warn(["CSV mod path missing", full_path, y])
+        y += 1
+        continue
+      }
+
+      -- returned, code file
+      global.bootstraps(full_path)
     }
 
     let name = mod_name
@@ -440,15 +443,10 @@ global.rmml.__load_csv_path = fun (path, mod_name) {
       }
     }
 
-    let obj = ds_grid_get(grid, 0, y)
-    let event = ds_grid_get(grid, 1, y)
-
-    if obj == "" and event == "" and global.rmml.__mod_set[name] {
-      y += 1
-      continue
-    }
-
-    global.rmml.register(obj, event, name, global.bootstraps(path))
+    global.rmml.register(
+      ds_grid_get(grid, 0, y), ds_grid_get(grid, 1, y),
+      name, code
+    )
     y += 1
   }
 
@@ -562,7 +560,7 @@ global.rmml.__add_controllers = fun () {
       if e != undefined {
         global.rmml.warn(["Err loading mod", name, e])
       }
-
+    }
     i += 1
   }
 }
