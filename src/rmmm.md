@@ -60,7 +60,7 @@ global.parse_json_file = fun (filename) {
 
 ```sp
 -- RMMM version
-self.version = 0.3
+self.version = 1
 -- manifest url
 -- DEBUG: test server
 -- self.manifest_url = "http://127.0.0.1:8080/manifest.json"

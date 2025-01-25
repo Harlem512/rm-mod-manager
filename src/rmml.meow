@@ -13,7 +13,7 @@ global.rmml_map = {}
 -- MARK: DATA
 global.rmml = {
   -- internal version number
-  version: 5.45,
+  version: 6,
   -- enables developer features
   dev: false,
 
@@ -178,7 +178,16 @@ global.rmml.register = fun (object, event, mod, fn) {
       global.rmml.log(["Game start for", mod])
       let cur = global.rmml_current_mod
       global.rmml_current_mod = mod
-      fn()
+
+      if global.rmml.dev {
+        fn()
+      } else {
+        let e = global.rmml.try_catch(fn)
+        if e != undefined {
+          global.rmml.warn(["Gamestart Fail", mod, e])
+        }
+      }
+      
       global.rmml_current_mod = cur
       global.rmml.__mod_set[mod] = true
     }
@@ -420,6 +429,7 @@ global.rmml.__load_csv_path = fun (path, mod_name) {
   while y < h {
     let path = string(ds_grid_get(grid, 2, y))
     let code = if string_starts_with(path, "do {") {
+      global.rmml.log(["Inline code", mod_name, path])
       -- returned, inline code
       global.__catspeak__.compile(global.__catspeak__.parseString(path))
     } else {
