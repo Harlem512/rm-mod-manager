@@ -8,7 +8,7 @@ import zipfile
 
 def post_process(code: str, minify=False, max_width=4090, purgeLogs=False, replaceQuotes=False):
     if purgeLogs:
-        code = re.sub(r'global\.rmml\.log\(.+\)', '', code)
+        code = re.sub(r'\s*global\.rmml\.log\(.+\)', '', code)
 
     if minify:
         code = untokenize(strip_whitespace(tokenise_meow(code)), max_width)
