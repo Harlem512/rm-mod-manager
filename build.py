@@ -140,10 +140,14 @@ if __name__ == "__main__":
                 "mod_0=rmml.ini\n",
             ]
         )
+    
+    with open("src/rmmm.md") as f:
+        raw = f.read()
+        rmmm_version = raw.splitlines()[4][22:].replace('.', '')
 
     with open("src/rmml.meow") as f:
         raw = f.read()
-        rmml_version = raw.splitlines()[15][11:-1].replace('.', '_')
+        rmml_version = raw.splitlines()[15][11:-1].replace('.', '')
         rmml_src = post_process(raw, purgeLogs=True)
 
     with open("build/rmml.meow", 'w') as f:
@@ -164,7 +168,7 @@ if __name__ == "__main__":
 
     # package rmml
     with zipfile.ZipFile(
-        f'dist/rmml_{rmml_version}.zip', 'w', zipfile.ZIP_DEFLATED
+        f'dist/rmml_{rmml_version}_{rmmm_version}.zip', 'w', zipfile.ZIP_DEFLATED
     ) as package:
         package.write("build/meta_info.ini", "meta_info.ini")
         package.write("build/modlist.txt", "modlist.txt")

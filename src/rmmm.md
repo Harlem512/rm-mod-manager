@@ -1,6 +1,9 @@
 Rusted Moss Mod Manager
 
 ```sp
+-- RMMM version
+global.rmmm_version = 1.1
+
 global.component = {
   click_inside: fun (x,y, w,h) {
     return mouse_check_button_pressed(mb_left)
@@ -59,12 +62,14 @@ global.parse_json_file = fun (filename) {
 ## create
 
 ```sp
--- RMMM version
-self.version = 1
 -- manifest url
 -- DEBUG: test server
 -- self.manifest_url = "http://127.0.0.1:8080/manifest.json"
-self.manifest_url = "https://raw.githubusercontent.com/Harlem512/rm-mod-database/refs/heads/main/manifest.json"
+if global.rmml.dev {
+  self.manifest_url = "https://raw.githubusercontent.com/Harlem512/rm-mod-database/refs/heads/main/dev_manifest.json"
+} else {
+  self.manifest_url = "https://raw.githubusercontent.com/Harlem512/rm-mod-database/refs/heads/main/manifest.json"
+}
 
 self.manifest_file = "mods/rmmm/manifest.json"
 self.depth = 0
@@ -143,7 +148,7 @@ self.cache_local = fun () {
       display: "Rusted Moss Mod Manager",
       description: "Manages mod installations and downloads mods.",
       author: "Harlem512",
-      version: self.version,
+      version: global.rmmm_version,
       type: "md",
     }
   }
@@ -329,6 +334,10 @@ if self.state == 0 {
   bg_w = w + 12
   bg_h = h + 12
 
+  if global.rmml.dev {
+    draw_set_color(c_blue)
+  }
+
   draw_sprite_stretched(sui_9slice, 0, bg_x, bg_y, bg_w, bg_h)
 
   if self.show_full_list {
@@ -368,9 +377,11 @@ if self.state == 0 {
     self.cache_local()
   }
 } else if self.state == -2 {
+  let del_name = self.delete_manifest.name
+
   -- confirm delete
   draw_sprite_stretched(sui_9slice, 0, 54, 64, 336, 88)
-  scribble("   Confirm delete mod:\n" + self.delete_manifest.name)
+  scribble("   Confirm delete mod:\n" + del_name)
       .blend(0, 1)
       .transform(2, 2, 0)
       .draw(60, 70)
@@ -383,15 +394,21 @@ if self.state == 0 {
     -- remove mod from list
     array_delete(self.sorted_local_mods, self.delete_index, 1)
     -- remove mod from manifest
-    struct_remove(self.local_manifest, self.delete_manifest.name)
+    struct_remove(self.local_manifest, del_name)
+    -- run uninstall script
+    if file_exists("mods/rmml/" + del_name + "/uninstall.meow") {
+      global.bootstraps("mods/rmml/" + del_name + "/uninstall.meow")()
+    }
     -- delete mod files
     if self.delete_manifest.type == "zip" {
       -- delete old mod
-      directory_destroy("mods/rmml/" + self.delete_manifest.name)
+      directory_destroy("mods/rmml/" + del_name)
     } else {
       -- delete old mod
-      file_delete("mods/rmml/" + self.delete_manifest.name)
+      file_delete("mods/rmml/" + del_name)
     }
+    -- remove local manifest version
+    self.foreign_manifest[del_name]._local = undefined
     self.save_manifest()
     self.force_restart = true
   }
