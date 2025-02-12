@@ -1,7 +1,6 @@
 Rusted Moss Mod Manager
 
 ```sp
-global.rmml.dev = true
 -- RMMM version
 global.rmmm_version = 1.2
 
