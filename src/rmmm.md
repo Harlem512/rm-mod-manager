@@ -1,8 +1,9 @@
 Rusted Moss Mod Manager
 
 ```sp
+global.rmml.dev = true
 -- RMMM version
-global.rmmm_version = 1.1
+global.rmmm_version = 1.2
 
 global.component = {
   click_inside: fun (x,y, w,h) {
@@ -66,7 +67,7 @@ global.parse_json_file = fun (filename) {
 -- DEBUG: test server
 -- self.manifest_url = "http://127.0.0.1:8080/manifest.json"
 if global.rmml.dev {
-  self.manifest_url = "https://raw.githubusercontent.com/Harlem512/rm-mod-database/refs/heads/main/dev_manifest.json"
+  self.manifest_url = "https://raw.githubusercontent.com/Harlem512/rm-mod-database/refs/heads/qa/dev_manifest.json"
 } else {
   self.manifest_url = "https://raw.githubusercontent.com/Harlem512/rm-mod-database/refs/heads/main/manifest.json"
 }
@@ -408,7 +409,9 @@ if self.state == 0 {
       file_delete("mods/rmml/" + del_name)
     }
     -- remove local manifest version
-    self.foreign_manifest[del_name]._local = undefined
+    if global.foreign_manifest {
+      self.foreign_manifest[self.delete_name]._local = undefined
+    }
     self.save_manifest()
     self.force_restart = true
   }
