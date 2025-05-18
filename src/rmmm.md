@@ -2,18 +2,18 @@ Rusted Moss Mod Manager
 
 ```sp
 -- RMMM version
-global.rmmm_version = 1.2
+global.rmmm_version = 1.3
 
 global.component = {
   click_inside: fun (x,y, w,h) {
     return mouse_check_button_pressed(mb_left)
-      and point_in_rectangle(global.mousex, global.mousey,
+      and point_in_rectangle(global.mouse_gui_x_, global.mouse_gui_y_,
         x, y,
         x + w, y + h)
   },
   label: fun (x, y, w, h, text, hover, hover_text) {
     let pin = if hover {
-      point_in_rectangle(global.mousex, global.mousey,
+      point_in_rectangle(global.mouse_gui_x_, global.mouse_gui_y_,
         x, y,
         x + w, y + h
       )
@@ -400,13 +400,8 @@ if self.state == 0 {
       global.bootstraps("mods/rmml/" + del_name + "/uninstall.meow")()
     }
     -- delete mod files
-    if self.delete_manifest.type == "zip" {
-      -- delete old mod
-      directory_destroy("mods/rmml/" + del_name)
-    } else {
-      -- delete old mod
-      file_delete("mods/rmml/" + del_name)
-    }
+    directory_destroy("mods/rmml/" + del_name)
+    file_delete("mods/rmml/" + del_name)
     -- remove local manifest version
     if global.foreign_manifest {
       self.foreign_manifest[self.delete_name]._local = undefined
@@ -563,7 +558,7 @@ if self.state == 0 {
       20, 30, 400, 17,
       undefined,
       "Scroll Up"
-    ) {
+    ) or mouse_wheel_up() {
       self.scroll = max(0, self.scroll - 1)
     }
     let i = 0
@@ -577,7 +572,7 @@ if self.state == 0 {
       20, 203, 400, 17,
       undefined,
       "Scroll Down"
-    ) {
+    ) or mouse_wheel_down() {
       self.scroll = min(max(len - 7, 0), self.scroll + 1)
     }
     i = 0

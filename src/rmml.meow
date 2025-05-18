@@ -13,7 +13,7 @@ global.rmml_map = {}
 -- MARK: DATA
 global.rmml = {
   -- internal version number
-  version: 6,
+  version: 6.1,
   -- enables developer features
   dev: false,
 
@@ -83,6 +83,8 @@ global.rmml = {
   __mod_set: {},
   -- list of all mods that need controllers
   __mod_controllers: {},
+  -- list of mods, in load order
+  __mod_controllers_load_order: [],
   -- quick-create event code, sets self.mod_name and returns
   __quick_create: ds_map_find_value(global.mod_map, "basic_events_create"),
   -- cached mod maps, for quicker mod loading on return to menu
@@ -98,7 +100,7 @@ global.rmml.try_catch = function (_try, _catch, a,b,c,d,e,f,g,h) {
   try {
     return _try(a,b,c,d,e,f,g,h)
   } catch (err) {
-    return _catch ? _catch(err) : err
+    return _catch ? _catch(err,a,b,c,d,e,f,g,h) : err
   }
 }"))
 
@@ -182,10 +184,9 @@ global.rmml.register = fun (object, event, mod, fn) {
       if global.rmml.dev {
         fn()
       } else {
-        let e = global.rmml.try_catch(fn)
-        if e != undefined {
+        global.rmml.try_catch(fn, fun (e, mod) {
           global.rmml.warn(["Gamestart Fail", mod, e])
-        }
+        }, mod)
       }
       
       global.rmml_current_mod = cur
@@ -234,6 +235,7 @@ global.rmml.register = fun (object, event, mod, fn) {
   if o_index == 0 and !global.rmml.__mod_controllers[mod] {
     global.rmml.log(["Need to add controller for",  mod])
     global.rmml.__mod_controllers[mod] = true
+    array_push(global.rmml.__mod_controllers_load_order, mod)
   }
 }
 
@@ -546,7 +548,7 @@ global.rmml.__load_file = fun (path) {
 -- MARK: Add Controllers
 -- adds a controller for each mod that needs one
 global.rmml.__add_controllers = fun () {
-  let ar = variable_struct_get_names(global.rmml.__mod_controllers)
+  let ar = global.rmml.__mod_controllers_load_order
   let n = array_length(ar)
   let i = 0
   while i < n {
@@ -558,18 +560,15 @@ global.rmml.__add_controllers = fun () {
       })
     } else {
       -- wrap in a try-catch to (hopefully) prevent startup crashes
-      let e = global.rmml.try_catch(
+      global.rmml.try_catch(
         fun (name) {
           instance_create_depth(0,0,0, omod_controller, {mod_name: name})
-          return undefined
         },
-        undefined,
+        fun (e, name) {
+          global.rmml.warn(["Err loading mod", name, e])
+        },
         ar[i]
       )
-
-      if e != undefined {
-        global.rmml.warn(["Err loading mod", name, e])
-      }
     }
     i += 1
   }
