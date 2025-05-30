@@ -158,7 +158,6 @@ if __name__ == "__main__":
             [
                 "# put your mods here (or disable them with #)\n",
                 "# mods are loaded (and run) in the order written here\n",
-                "rmml.meow\n",
                 "rmmm.md\n"
             ]
         )

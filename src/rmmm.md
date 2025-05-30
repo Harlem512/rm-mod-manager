@@ -2,7 +2,7 @@ Rusted Moss Mod Manager
 
 ```sp
 -- RMMM version
-global.rmmm_version = 1.3
+global.rmmm_version = 1.4
 
 global.component = {
   click_inside: fun (x,y, w,h) {
@@ -25,10 +25,10 @@ global.component = {
       draw_text(x + 6, y + 6, text)
     }
 
-    -- tool tip in bottom right
+    -- tool tip in bottom left
     if pin and hover_text != undefined {
       global.component.label(2, 226,
-        string_length(hover_text) * 6 + 24, 22,
+        string_length(hover_text) * 6 + 12, 22,
         hover_text)
     }
 
@@ -92,6 +92,8 @@ self.show_full_list = true
 self.downloading_manifest = undefined
 -- true if we must force a restart
 self.force_restart = false
+-- true if rmmm is being disabled (show a warning on the exit screen)
+self.disabling_rmmm = false
 
 -- true if a mod is being downloaded
 self.downloading_mod = false
@@ -122,6 +124,8 @@ self.directory = fun (file) {
 --                            cache local manifest
 -- -----------------------------------------------------------------------------
 self.cache_local = fun () {
+  -- reset disable message
+  self.disabling_rmmm = false
   -- raw manifest
   let raw_manifest = {}
   if file_exists(self.manifest_file) {
@@ -227,7 +231,7 @@ self.cache_local = fun () {
 
 self.save_mods = fun () {
   let list = file_text_open_write("mods/modlist.txt")
-  file_text_write_string(list, "# put your mods here (or disable them with #)\n# mods are loading (and run) in the order written here\n# this file is also managed by RMMM\n")
+  file_text_write_string(list, "# put your mods here (or disable them with #)\n# mods are loaded (and run) in the order written here\n# this file is also managed by RMMM\n")
   let i = 0
   while i < array_length(self.sorted_local_mods) {
     let mod = self.sorted_local_mods[i]
@@ -356,7 +360,13 @@ if self.state == 0 {
 } else if self.state == -1 {
   -- confirm save
   draw_sprite_stretched(sui_9slice, 0, 54, 64, 336, 88)
-  scribble("  Changing your mod list\n    requires restarting\n        Rusted Moss")
+  scribble(
+    if self.disabling_rmmm {
+      "[shake]Disabling RMMM will prevent\nyou from modifying your\nmod list in-game[/shake]"
+    } else {
+      "  Changing your mod list\n    requires restarting\n        Rusted Moss"
+    }
+  )
       .blend(0, 1)
       .transform(2, 2, 0)
       .draw(60, 70)
@@ -381,7 +391,13 @@ if self.state == 0 {
 
   -- confirm delete
   draw_sprite_stretched(sui_9slice, 0, 54, 64, 336, 88)
-  scribble("   Confirm delete mod:\n" + del_name)
+  scribble(
+    if del_name == "rmmm.md" {
+      "[shake]Deleting RMMM will prevent\nyou from modifying your\nmod list in-game[/shake]"
+    } else {
+      "   Confirm delete mod:\n" + del_name
+    }
+  )
       .blend(0, 1)
       .transform(2, 2, 0)
       .draw(60, 70)
@@ -608,6 +624,10 @@ if self.state == 0 {
           if mod_meta.disabled { "" } else { "X" },
           if mod_meta.disabled { "Enable Mod" } else { "Disable Mod" },
         ) {
+          -- we're disabling rmmm
+          if mod_meta.manifest.name == "rmmm.md" {
+            self.disabling_rmmm = !mod_meta.disabled
+          }
           mod_meta.disabled = !mod_meta.disabled
         }
 

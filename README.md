@@ -1,6 +1,7 @@
 # Rusted Moss Mod Manager
 
-![RMML Latest Downloads](https://img.shields.io/github/downloads/Harlem512/rm-mod-manager/1.3/rmml_6_13.zip?color=blue&label=latest)
+![RMML Latest Downloads](https://img.shields.io/github/downloads/Harlem512/rm-mod-manager/1.4/rmml_6_14.zip?color=blue&label=latest)
+![RMML Historical Downloads](https://img.shields.io/github/downloads/Harlem512/rm-mod-manager/1.3/rmml_6_13.zip?color=blue&label=historical)
 ![RMML Historical Downloads](https://img.shields.io/github/downloads/Harlem512/rm-mod-manager/1.2/rmml_6_12.zip?color=blue&label=historical)
 
 ![preview](preview.gif)
