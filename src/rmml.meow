@@ -13,7 +13,7 @@ global.rmml_map = {}
 -- MARK: DATA
 global.rmml = {
   -- internal version number
-  version: 6.1,
+  version: 6.2,
   -- enables developer features
   dev: false,
 
@@ -97,6 +97,7 @@ global.rmml = {
 -- MARK: Try-Catch
 live_snippet_call(live_snippet_create("
 global.rmml.try_catch = function (_try, _catch, a,b,c,d,e,f,g,h) {
+  method_get_self(global.rmml.try_catch).callTime = infinity
   try {
     return _try(a,b,c,d,e,f,g,h)
   } catch (err) {
@@ -107,6 +108,7 @@ global.rmml.try_catch = function (_try, _catch, a,b,c,d,e,f,g,h) {
 -- MARK: Shallow Clone
 -- clones a struct of structs
 global.rmml.clone = fun (struct) {
+  method_get_self(global.rmml.clone).callTime = infinity
   let new_struct = {}
   let event_names = variable_struct_get_names(struct)
   let event_index = array_length(event_names) - 1
@@ -172,6 +174,7 @@ global.rmml.__HIR_path = [
 ]
 
 global.rmml.register = fun (object, event, mod, fn) {
+  method_get_self(global.rmml.register).callTime = infinity
   if
     (object == undefined and event == undefined)
     or (object == "" and event == "")
@@ -241,6 +244,7 @@ global.rmml.register = fun (object, event, mod, fn) {
 
 -- MARK: Unload
 global.rmml.unload = fun (mod_name) {
+  method_get_self(global.rmml.unload).callTime = infinity
   if mod_name == undefined {
     mod_name = global.rmml_current_mod
   }
@@ -272,6 +276,7 @@ global.rmml.unload = fun (mod_name) {
 -- MARK: Load INI
 -- loads the passed file path as an ini mod
 global.rmml.__load_ini_path = fun (ini_path, mod_name) {
+  method_get_self(global.rmml.__load_ini_path).callTime = infinity
   ini_open("mods/rmml/" + ini_path)
   let objects = global.rmml.objects
   let events = global.rmml.events
@@ -302,6 +307,7 @@ global.rmml.__load_ini_path = fun (ini_path, mod_name) {
 -- MARK: Load MD
 -- loads the passed file path as a md mod
 global.rmml.__load_md_path = fun (md_path, mod_name) {
+  method_get_self(global.rmml.__load_md_path).callTime = infinity
   let full_buff = buffer_load("mods/rmml/" + md_path)
 
   let mod_file = file_text_open_read("mods/rmml/" + md_path)
@@ -411,6 +417,7 @@ global.rmml.__load_md_path = fun (md_path, mod_name) {
 -- MARK: Load CSV
 -- object event filename ?modname
 global.rmml.__load_csv_path = fun (path, mod_name) {
+  method_get_self(global.rmml.__load_csv_path).callTime = infinity
   let grid = load_csv("mods/rmml/" + path)
 
   if !grid or !ds_exists(grid, ds_type_grid) {
@@ -467,6 +474,7 @@ global.rmml.__load_csv_path = fun (path, mod_name) {
 
 -- MARK: Compile modlist
 global.rmml.__compile_mod_list = fun(list) {
+  method_get_self(global.rmml.__compile_mod_list).callTime = infinity
   if !file_exists(list) {
     global.rmml.warn("Missing list" + list)
     return
@@ -496,6 +504,7 @@ global.rmml.__compile_mod_list = fun(list) {
 --   path.meow
 --   thing  -> thing/thing.md or thing/index.md or thing/index.csv
 global.rmml.__load_file = fun (path) {
+  method_get_self(global.rmml.__load_file).callTime = infinity
   let name
 
   global.rmml.log("LOAD mod " + path)
@@ -548,6 +557,7 @@ global.rmml.__load_file = fun (path) {
 -- MARK: Add Controllers
 -- adds a controller for each mod that needs one
 global.rmml.__add_controllers = fun () {
+  method_get_self(global.rmml.__add_controllers).callTime = infinity
   let ar = global.rmml.__mod_controllers_load_order
   let n = array_length(ar)
   let i = 0
@@ -580,10 +590,8 @@ global.rmml.__boot = fun() {
   let loading_music = audio_play_sound(snd_music_tea_party, 0, true, 1)
 
   -- disable runtime limit
-  let s = method_get_self(ds_map_find_value(global.mod_map,"controller_events_create"))
-  s.callTime = infinity
-  s = method_get_self(global.rmml.__boot)
-  s.callTime = infinity
+  method_get_self(ds_map_find_value(global.mod_map,"controller_events_create")).callTime = infinity
+  method_get_self(global.rmml.__boot).callTime = infinity
 
   -- blow up omod_meta and initial controller
   instance_destroy(omod_meta)

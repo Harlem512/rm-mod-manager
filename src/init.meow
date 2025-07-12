@@ -1,6 +1,7 @@
 -- bootstrap loader function
 if !global.bootstraps {
   global.bootstraps = fun (filename) {
+    method_get_self(global.bootstraps).callTime = infinity
     let buff = buffer_load(filename)
     let parsed = global.__catspeak__.parse(buff)
     buffer_delete(buff)
