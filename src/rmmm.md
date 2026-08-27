@@ -603,6 +603,10 @@ if self.state == 0 {
     let bot = min(1, 7 / len)
     draw_sprite_stretched_ext(sui_9slice, 0, 6, 30 + top * 190, 10, bot * 190, c_gray, 1)
 
+    if mouse_check_button(mb_left) and point_in_rectangle(global.mouse_gui_x_, global.mouse_gui_y_, 4, 30, 12, 190) {
+      self.scroll = round((global.mouse_gui_y_ - 30) / 160 * (len - 7))
+    }
+
     -- the table
     let index = self.scroll
     let offset = 0
