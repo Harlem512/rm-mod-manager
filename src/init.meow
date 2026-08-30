@@ -9,9 +9,7 @@ if !global.bootstraps {
   }
 }
 -- load RMML, if we haven't already
-if !global.rmml {
-  global.bootstraps("mods/rmml/rmml.meow")()
-}
+if !global.rmml { global.bootstraps("mods/rmml/rmml.meow")() }
 
 -- Boot RMML
 global.rmml.__boot()

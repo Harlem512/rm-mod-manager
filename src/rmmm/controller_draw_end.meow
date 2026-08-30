@@ -41,15 +41,21 @@ if self.state == 0 {
   -- ---------------------------------------------------------------------------
   --                                rmmm button
   -- ---------------------------------------------------------------------------
-  if global.component.button(
-    418, 2, 22, 22,
-  ) {
+  if global.component.button(418, 2, 22, 22) {
     next_state = 1
     menu.state = -512
     self.cache_local()
   }
-  draw_sprite_ext(smenu_bar,1, 429,13, 1,1, 0,
-    if global.rmml.warnings != "" { c_red } else { c_black }, 1
+  draw_sprite_ext(
+    smenu_bar,
+    1,
+    429,
+    13,
+    1,
+    1,
+    0,
+    if global.rmml.warnings != "" { c_red } else { c_black },
+    1,
   )
 
   -- ---------------------------------------------------------------------------
@@ -61,9 +67,7 @@ if self.state == 0 {
   bg_w = w + 12
   bg_h = h + 12
 
-  if global.rmml.dev {
-    draw_set_color(c_blue)
-  }
+  if global.rmml.dev { draw_set_color(c_blue) }
 
   draw_sprite_stretched(sui_9slice, 0, bg_x, bg_y, bg_w, bg_h)
 
@@ -88,24 +92,28 @@ if self.state == 0 {
       "[shake]Disabling RMMM will prevent\nyou from modifying your\nmod list in-game[/shake]"
     } else {
       "  Changing your mod list\n    requires restarting\n        Rusted Moss"
-    }
+    },
   )
-      .blend(0, 1)
-      .transform(2, 2, 0)
-      .draw(60, 70)
+    .blend(
+    0,
+    1,
+  )
+    .transform(
+    2,
+    2,
+    0,
+  )
+    .draw(
+    60,
+    70,
+  )
 
-  if global.component.button(
-    154, 164, 78, 22,
-    "Save & Quit",
-  ) {
+  if global.component.button(154, 164, 78, 22, "Save & Quit") {
     self.save_mods()
     game_end()
   }
 
-  if global.component.button(
-    242, 164, 48, 22,
-    "Cancel",
-  ) {
+  if global.component.button(242, 164, 48, 22, "Cancel") {
     next_state = 1
     self.cache_local()
   }
@@ -119,16 +127,23 @@ if self.state == 0 {
       "[shake]Deleting RMMM will prevent\nyou from modifying your\nmod list in-game[/shake]"
     } else {
       "   Confirm delete mod:\n" + del_name
-    }
+    },
   )
-      .blend(0, 1)
-      .transform(2, 2, 0)
-      .draw(60, 70)
+    .blend(
+    0,
+    1,
+  )
+    .transform(
+    2,
+    2,
+    0,
+  )
+    .draw(
+    60,
+    70,
+  )
 
-  if global.component.button(
-    154, 164, 78, 22,
-    "Delete Mod",
-  ) {
+  if global.component.button(154, 164, 78, 22, "Delete Mod") {
     next_state = 1
     -- remove mod from list
     array_delete(self.sorted_local_mods, self.delete_index, 1)
@@ -149,67 +164,61 @@ if self.state == 0 {
     self.force_restart = true
   }
 
-  if global.component.button(
-    242, 164, 48, 22,
-    "Cancel",
-  ) {
-    next_state = 1
-  }
--- confirm delete rmmm button
+  if global.component.button(242, 164, 48, 22, "Cancel") { next_state = 1 }
+  -- confirm delete rmmm button
 } else if self.state == -3 {
-    -- confirm delete
+  -- confirm delete
   draw_sprite_stretched(sui_9slice, 0, 54, 34, 336, 118)
-  scribble("   Are you sure you want\n    to completely reset\n  Rusted Moss Mod Loader?\n This will remove all mods")
-      .blend(0, 1)
-      .transform(2, 2, 0)
-      .draw(60, 39)
+  scribble(
+    "   Are you sure you want\n    to completely reset\n  Rusted Moss Mod Loader?\n This will remove all mods",
+  )
+    .blend(
+    0,
+    1,
+  )
+    .transform(
+    2,
+    2,
+    0,
+  )
+    .draw(
+    60,
+    39,
+  )
 
-  if global.component.button(
-    160, 164, 72, 22,
-    "Reset RMMM",
-  ) {
+  if global.component.button(160, 164, 72, 22, "Reset RMMM") {
     directory_destroy("mods")
     game_end()
   }
 
-  if global.component.button(
-    242, 164, 48, 22,
-    "Cancel",
-  ) {
-    next_state = 1
-  }
--- main tab is open
+  if global.component.button(242, 164, 48, 22, "Cancel") { next_state = 1 }
+  -- main tab is open
 } else {
   -- ---------------------------------------------------------------------------
   --                                 main tab
   -- ---------------------------------------------------------------------------
   -- cancel button
   if !self.force_restart {
-    if global.component.button(
-      394, 2, 48, 22,
-      "Cancel",
-    ) {
+    if global.component.button(394, 2, 48, 22, "Cancel") {
       next_state = 0
       menu.state = 14
     }
   }
 
   -- save button
-  if global.component.button(
-    314, 2, 78, 22,
-    "Save & Quit",
-  ) {
-    next_state = -1
-  }
+  if global.component.button(314, 2, 78, 22, "Save & Quit") { next_state = -1 }
 
   -- background
   draw_sprite_stretched(sui_9slice, 0, 2, 26, 440, 198)
 
   -- installed mods tab
   if global.component.button(
-    6, 2, 96, 22 + (self.state == 1) * 7,
-    "Installed Mods",
-  ) {
+      6,
+      2,
+      96,
+      22 + (self.state == 1) * 7,
+      "Installed Mods",
+    ) {
     next_state = 1
     self.cache_local()
     self.scroll = 0
@@ -217,9 +226,12 @@ if self.state == 0 {
 
   -- current mods tab
   if global.component.button(
-    104, 2, 78, 22 + (self.state == 2 or self.state == 3) * 7,
-    "Browse Mods",
-  ) {
+      104,
+      2,
+      78,
+      22 + (self.state == 2 or self.state == 3) * 7,
+      "Browse Mods",
+    ) {
     if self.foreign_manifest {
       next_state = 2
       self.scroll = 0
@@ -229,11 +241,8 @@ if self.state == 0 {
     }
   }
 
-    -- current mods tab
-  if global.component.button(
-    209, 2, 78, 22,
-    "View Online",
-  ) {
+  -- current mods tab
+  if global.component.button(209, 2, 78, 22, "View Online") {
     url_open("https://github.com/Harlem512/rm-mod-database")
   }
 
@@ -247,26 +256,30 @@ if self.state == 0 {
         self.downloading_manifest = false
         self.foreign_manifest = global.parse_json_file(f)
         if !is_struct(self.foreign_manifest) {
-          global.rmml.throw("There was an error parsing\nthe foreign manifest\nPlease contact Harlem512 or try again later")
+          global.rmml.throw(
+            "There was an error parsing\nthe foreign manifest\nPlease contact Harlem512 or try again later",
+          )
         }
         self.transform_foreign_manifest()
         file_delete(f)
         next_state = 2
       }
-      scribble("Downloading manifest...")
-        .blend(0, 1)
-        .transform(2, 2, 0)
-        .draw(78, 70)
+      scribble("Downloading manifest...").blend(0, 1).transform(2, 2, 0).draw(
+        78,
+        70,
+      )
     } else {
-      scribble("Download manifest\n  to continue")
-        .blend(0, 1)
-        .transform(2, 2, 0)
-        .draw(121, 70)
+      scribble("Download manifest\n  to continue").blend(0, 1).transform(
+        2,
+        2,
+        0,
+      )
+        .draw(
+        121,
+        70,
+      )
 
-      if global.component.button(
-        192, 164, 60, 22,
-        "Download",
-      ) {
+      if global.component.button(192, 164, 60, 22, "Download") {
         self.downloading_manifest = true
         let f = self.directory("foreign_manifest.json")
         file_delete(f)
@@ -274,49 +287,72 @@ if self.state == 0 {
       }
     }
   } else if self.state == 4 {
-    draw_text(8, 38, "This directory contains initial and manually installed mods:")
-    scribble(program_directory_get() + "mods")
-      .blend(0, 1)
-      .fit_to_box(438, 186)
-      .draw(8, 60)
+    draw_text(
+      8,
+      38,
+      "This directory contains initial and manually installed mods:",
+    )
+    scribble(program_directory_get() + "mods").blend(0, 1).fit_to_box(438, 186)
+      .draw(
+      8,
+      60,
+    )
   } else if self.state == 5 {
     draw_text(8, 38, "This directory contains mods downloaded by RMMM:")
-    scribble(game_save_id_get() + "mods")
-      .blend(0, 1)
-      .fit_to_box(438, 186)
-      .draw(8, 60)
+    scribble(game_save_id_get() + "mods").blend(0, 1).fit_to_box(438, 186).draw(
+      8,
+      60,
+    )
   } else {
     -- -------------------------------------------------------------------------
     --                                list box
     -- -------------------------------------------------------------------------
-    let list = if self.state == 1 { self.sorted_local_mods } else { self.foreign_manifest_list }
+    let list = if self.state == 1 {
+      self.sorted_local_mods
+    } else {
+      self.foreign_manifest_list
+    }
     let len = array_length(list)
 
     -- scroll up
-    if global.component.button(
-      20, 30, 400, 17,
-      undefined,
-      "Scroll Up"
-    ) or mouse_wheel_up() {
+    if global.component.button(20, 30, 400, 17, undefined, "Scroll Up") or
+        mouse_wheel_up() {
       self.scroll = max(0, self.scroll - 1)
     }
     let i = 0
     while i < 6 {
-      draw_sprite_ext(sui_arrow_white_alt,0, 63 + i * 78,39, 1,1, 180, c_black,1)
+      draw_sprite_ext(
+        sui_arrow_white_alt,
+        0,
+        63 + i * 78,
+        39,
+        1,
+        1,
+        180,
+        c_black,
+        1,
+      )
       i += 1
     }
 
     -- scroll down
-    if global.component.button(
-      20, 203, 400, 17,
-      undefined,
-      "Scroll Down"
-    ) or mouse_wheel_down() {
+    if global.component.button(20, 203, 400, 17, undefined, "Scroll Down") or
+        mouse_wheel_down() {
       self.scroll = min(max(len - 7, 0), self.scroll + 1)
     }
     i = 0
     while i < 6 {
-      draw_sprite_ext(sui_arrow_white_alt,0, 63 + i * 78,211, 1,1, 0, c_black,1)
+      draw_sprite_ext(
+        sui_arrow_white_alt,
+        0,
+        63 + i * 78,
+        211,
+        1,
+        1,
+        0,
+        c_black,
+        1,
+      )
       i += 1
     }
 
@@ -324,7 +360,16 @@ if self.state == 0 {
     draw_sprite_stretched(sui_9slice, 0, 6, 30, 10, 190)
     let top = self.scroll / len
     let bot = min(1, 7 / len)
-    draw_sprite_stretched_ext(sui_9slice, 0, 6, 30 + top * 190, 10, bot * 190, c_gray, 1)
+    draw_sprite_stretched_ext(
+      sui_9slice,
+      0,
+      6,
+      30 + top * 190,
+      10,
+      bot * 190,
+      c_gray,
+      1,
+    )
 
     -- the table
     let index = self.scroll
@@ -343,10 +388,13 @@ if self.state == 0 {
       if self.state == 1 {
         -- enable/disable
         if global.component.button(
-          16, y, 17, 22,
-          if mod_meta.disabled { "" } else { "X" },
-          if mod_meta.disabled { "Enable Mod" } else { "Disable Mod" },
-        ) {
+            16,
+            y,
+            17,
+            22,
+            if mod_meta.disabled { "" } else { "X" },
+            if mod_meta.disabled { "Enable Mod" } else { "Disable Mod" },
+          ) {
           -- we're disabling rmmm
           if mod_meta.manifest.name == "rmmm.md" {
             self.disabling_rmmm = !mod_meta.disabled
@@ -355,45 +403,55 @@ if self.state == 0 {
         }
 
         -- reorder up
-        if global.component.button(
-          35, y, 18, 22,
-          undefined,
-          "Load Earlier"
-        ) {
+        if global.component.button(35, y, 18, 22, undefined, "Load Earlier") {
           if index != 0 and len > 1 {
             self.sorted_local_mods[index] = self.sorted_local_mods[index - 1]
             self.sorted_local_mods[index - 1] = mod_meta
           }
         }
-        draw_sprite_ext(sui_arrow_white_alt,0, 44,y+11, 1,1, 180, c_black,1)
+        draw_sprite_ext(
+          sui_arrow_white_alt,
+          0,
+          44,
+          y + 11,
+          1,
+          1,
+          180,
+          c_black,
+          1,
+        )
 
         -- reorder down
-        if global.component.button(
-          55, y, 18, 22,
-          undefined,
-          "Load Later"
-        ) {
+        if global.component.button(55, y, 18, 22, undefined, "Load Later") {
           if index < len - 1 and len > 1 {
             self.sorted_local_mods[index] = self.sorted_local_mods[index + 1]
             self.sorted_local_mods[index + 1] = mod_meta
           }
         }
-        draw_sprite_ext(sui_arrow_white_alt,0, 64,y+11, 1,1, 0, c_black,1)
+        draw_sprite_ext(sui_arrow_white_alt, 0, 64, y + 11, 1, 1, 0, c_black, 1)
 
         -- delete
-        if global.component.button(
-          75, y, 19, 22,
-          undefined,
-          "Delete Mod"
-        ) {
+        if global.component.button(75, y, 19, 22, undefined, "Delete Mod") {
           next_state = -2
           self.delete_index = index
           self.delete_manifest = mod_meta.manifest
         }
-        draw_sprite_ext(seditor_delete_button_icon,2, 84,y+10, 1,1, 0, c_black,1)
+        draw_sprite_ext(
+          seditor_delete_button_icon,
+          2,
+          84,
+          y + 10,
+          1,
+          1,
+          0,
+          c_black,
+          1,
+        )
 
-        label = mod_meta.manifest.display + "  (v" + string(mod_meta.manifest.version) + ")"
-      -- BROWSE MODS
+        label = mod_meta.manifest.display + "  (v" +
+          string(mod_meta.manifest.version) +
+          ")"
+        -- BROWSE MODS
       } else {
         -- downloading state check
         if mod_meta._downloading {
@@ -435,20 +493,27 @@ if self.state == 0 {
           }
 
           -- draw loading kid
-          draw_sprite(snpc_kids_3, 0,
-            46 + sin(current_time_get() / 240 % 314) * 20,y+22
+          draw_sprite(
+            snpc_kids_3,
+            0,
+            46 + sin(current_time_get() / 240 % 314) * 20,
+            y + 22,
           )
         } else {
           if global.component.button(
-            16, y, 80, 22,
-            if mod_meta._local == undefined {
-              "  Download"
-            } else if mod_meta._local < mod_meta.version {
-              "   Update"
-            } else {
-              " Re-install"
-            }
-          ) and !self.downloading_mod {
+              16,
+              y,
+              80,
+              22,
+              if mod_meta._local == undefined {
+                "  Download"
+              } else if mod_meta._local < mod_meta.version {
+                "   Update"
+              } else {
+                " Re-install"
+              },
+            ) and
+              !self.downloading_mod {
             self.downloading_mod = true
             mod_meta._downloading = true
             let f = self.directory(mod_meta.name)
@@ -461,11 +526,7 @@ if self.state == 0 {
       }
 
       -- render mod name
-      if global.component.label(
-        96, y, 340, 22,
-        label,
-        true
-      ) {
+      if global.component.label(96, y, 340, 22, label, true) {
         if self.state == 1 {
           hovered = mod_meta.manifest
         } else {
@@ -480,14 +541,19 @@ if self.state == 0 {
     if hovered {
       draw_sprite_stretched(sui_9slice, 0, 190, 26, 252, 198)
       draw_text(196, 32, hovered.display)
-      draw_text(196, 44, hovered.name + " (v" + string(hovered.version) + ")  By: " + hovered.author)
+      draw_text(
+        196,
+        44,
+        hovered.name + " (v" + string(hovered.version) + ")  By: " +
+          hovered.author,
+      )
       draw_set_color(#58514A)
       draw_line(192, 57, 438, 57)
       draw_set_color(c_black)
-      scribble(hovered.description)
-        .blend(0, 1)
-        .fit_to_box(240, 186)
-        .draw(196, 60)
+      scribble(hovered.description).blend(0, 1).fit_to_box(240, 186).draw(
+        196,
+        60,
+      )
     }
   }
 
@@ -498,10 +564,7 @@ if self.state == 0 {
   -- bottom bar
   if global.rmml.warnings != "" {
     -- render rmml warnings
-    if global.component.button(
-      2, 226, 440, 22,
-      global.rmml.warnings,
-    ) {
+    if global.component.button(2, 226, 440, 22, global.rmml.warnings) {
       show_message(string_replace_all(global.rmml.warnings, "|", "\n"))
     }
   } else {
@@ -510,28 +573,19 @@ if self.state == 0 {
     draw_text(382, 232, "rmml " + string(global.rmml.version))
 
     -- delete all mods
-    if global.component.button(
-      302, 226, 72, 22,
-      "Reset RMMM",
-    ) {
+    if global.component.button(302, 226, 72, 22, "Reset RMMM") {
       next_state = -3
     }
 
     -- game folder
     off = (self.state == 4) * 7
-    if global.component.button(
-      222, 226 - off, 78, 22 + off
-      "Game Folder",
-    ) {
+    if global.component.button(222, 226 - off, 78, 22 + off, "Game Folder") {
       next_state = 4
     }
 
     -- save folder
     off = (self.state == 5) * 7
-    if global.component.button(
-      142, 226 - off, 78, 22 + off
-      "Save Folder",
-    ) {
+    if global.component.button(142, 226 - off, 78, 22 + off, "Save Folder") {
       next_state = 5
     }
   }

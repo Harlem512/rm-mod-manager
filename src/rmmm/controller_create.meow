@@ -2,9 +2,11 @@
 -- DEBUG: test server
 -- self.manifest_url = "http://127.0.0.1:8080/manifest.json"
 if global.rmml.dev {
-  self.manifest_url = "https://raw.githubusercontent.com/Harlem512/rm-mod-database/refs/heads/qa/dev_manifest.json"
+  self
+    .manifest_url = "https://raw.githubusercontent.com/Harlem512/rm-mod-database/refs/heads/qa/dev_manifest.json"
 } else {
-  self.manifest_url = "https://raw.githubusercontent.com/Harlem512/rm-mod-database/refs/heads/main/manifest.json"
+  self
+    .manifest_url = "https://raw.githubusercontent.com/Harlem512/rm-mod-database/refs/heads/main/manifest.json"
 }
 
 self.manifest_file = "mods/rmmm/manifest.json"
@@ -43,18 +45,14 @@ self.transform_foreign_manifest = fun () {
     let mod_name = names[j]
     let meta = self.foreign_manifest[mod_name]
     let local = self.local_manifest[mod_name]
-    if local {
-      meta._local = local.version
-    }
+    if local { meta._local = local.version }
     array_push(self.foreign_manifest_list, meta)
     j += 1
   }
 }
 
 -- temporary downloads
-self.directory = fun (file) {
-  return temp_directory_get() + "rmmm/" + file
-}
+self.directory = fun (file) { return temp_directory_get() + "rmmm/" + file }
 
 -- -----------------------------------------------------------------------------
 --                            cache local manifest
@@ -133,19 +131,16 @@ self.cache_local = fun () {
     }
 
     -- rmml is not a mod for the modlist
-    if mod_path == "rmml.meow" {
-      continue
-    }
+    if mod_path == "rmml.meow" { continue }
 
     -- add mod to the array if it exists locally and hasn't already been added
     let manifest = self.local_manifest[mod_path]
     if !found_mods[mod_path] and manifest {
       found_mods[mod_path] = true
-      array_push(self.sorted_local_mods, {
-        path: mod_path,
-        disabled: disabled,
-        manifest: manifest
-      })
+      array_push(
+        self.sorted_local_mods,
+        { path: mod_path, disabled: disabled, manifest: manifest },
+      )
     }
   }
   file_text_close(f)
@@ -155,11 +150,10 @@ self.cache_local = fun () {
   while i < array_length(local_mods) {
     let mod = local_mods[i]
     if !found_mods[mod] and mod != "rmml.meow" {
-      array_push(self.sorted_local_mods, {
-        path: mod,
-        disabled: true,
-        manifest: self.local_manifest[mod],
-      })
+      array_push(
+        self.sorted_local_mods,
+        { path: mod, disabled: true, manifest: self.local_manifest[mod] },
+      )
     }
     i += 1
   }
@@ -167,7 +161,10 @@ self.cache_local = fun () {
 
 self.save_mods = fun () {
   let list = file_text_open_write("mods/modlist.txt")
-  file_text_write_string(list, "# put your mods here (or disable them with #)\n# mods are loaded (and run) in the order written here\n# this file is also managed by RMMM\n")
+  file_text_write_string(
+    list,
+    "# put your mods here (or disable them with #)\n# mods are loaded (and run) in the order written here\n# this file is also managed by RMMM\n",
+  )
   let i = 0
   while i < array_length(self.sorted_local_mods) {
     let mod = self.sorted_local_mods[i]
@@ -180,7 +177,6 @@ self.save_mods = fun () {
   }
   file_text_close(list)
 }
-
 
 self.save_manifest = fun () {
   let manifest = file_text_open_write(self.manifest_file)

@@ -2,42 +2,59 @@
 global.rmmm_version = 1.4
 
 global.component = {
-  click_inside: fun (x,y, w,h) {
-    return mouse_check_button_pressed(mb_left)
-      and point_in_rectangle(global.mouse_gui_x_, global.mouse_gui_y_,
-        x, y,
-        x + w, y + h)
+  click_inside: fun (x, y, w, h) {
+    return mouse_check_button_pressed(mb_left) and
+      point_in_rectangle(
+        global.mouse_gui_x_,
+        global.mouse_gui_y_,
+        x,
+        y,
+        x + w,
+        y + h,
+      )
   },
   label: fun (x, y, w, h, text, hover, hover_text) {
     let pin = if hover {
-      point_in_rectangle(global.mouse_gui_x_, global.mouse_gui_y_,
-        x, y,
-        x + w, y + h
+      point_in_rectangle(
+        global.mouse_gui_x_,
+        global.mouse_gui_y_,
+        x,
+        y,
+        x + w,
+        y + h,
       )
     }
 
-    draw_sprite_stretched_ext(sui_9slice, 0, x, y, w, h,
-      if pin {c_ltgray} else {c_white}, 1)
-    if text != undefined {
-      draw_text(x + 6, y + 6, text)
-    }
+    draw_sprite_stretched_ext(
+      sui_9slice,
+      0,
+      x,
+      y,
+      w,
+      h,
+      if pin { c_ltgray } else { c_white },
+      1,
+    )
+    if text != undefined { draw_text(x + 6, y + 6, text) }
 
     -- tool tip in bottom left
     if pin and hover_text != undefined {
-      global.component.label(2, 226,
-        string_length(hover_text) * 6 + 12, 22,
-        hover_text)
+      global.component.label(
+        2,
+        226,
+        string_length(hover_text) * 6 + 12,
+        22,
+        hover_text,
+      )
     }
 
     return pin
   },
   button: fun (x, y, w, h, text, hover_text) {
-    let click = global.component.label(x, y, w, h, text, true, hover_text)
-        and mouse_check_button_pressed(mb_left)
+    let click = global.component.label(x, y, w, h, text, true, hover_text) and
+      mouse_check_button_pressed(mb_left)
 
-    if click {
-      audio_play_sound_volume(snd_menu_1, 1, 1)
-    }
+    if click { audio_play_sound_volume(snd_menu_1, 1, 1) }
 
     return click
   },
@@ -45,10 +62,14 @@ global.component = {
 
 -- parse json
 global.parse_json_file = fun (filename) {
-  return global.rmml.try_catch(fun (filename) {
-    b = buffer_load(filename)
-    s = buffer_read(b, buffer_string)
-    buffer_delete(b)
-    return json_parse(s)
-  }, undefined, filename)
+  return global.rmml.try_catch(
+    fun (filename) {
+      b = buffer_load(filename)
+      s = buffer_read(b, buffer_string)
+      buffer_delete(b)
+      return json_parse(s)
+    },
+    undefined,
+    filename,
+  )
 }
