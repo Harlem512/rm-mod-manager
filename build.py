@@ -1,12 +1,19 @@
 from typing import Any, Generator
 from highlight import *
+from transpiler import Mod
 from more_itertools import peekable
 import re
 import shutil
 import zipfile
 
 
-def post_process(code: str, minify=False, max_width=4090, purgeLogs=False, replaceQuotes=False):
+def post_process(
+    code: str,
+    minify=False,
+    max_width=4090,
+    purgeLogs=False,
+    replaceQuotes=False,
+):
     if purgeLogs:
         code = re.sub(r'\s*global\.rmml\.log\(.+\)', '', code)
 
@@ -14,9 +21,7 @@ def post_process(code: str, minify=False, max_width=4090, purgeLogs=False, repla
         code = untokenize(strip_whitespace(tokenise_meow(code)), max_width)
 
     if replaceQuotes:
-        code = re.sub(
-            r"'.'", lambda match: f'ord("{match.group(0)[1]}")', code
-        )
+        code = re.sub(r"'.'", lambda match: f'ord("{match.group(0)[1]}")', code)
         if "'" in code:
             raise SyntaxError("Code contains unclosed single quotes", code)
 
@@ -115,7 +120,9 @@ def untokenize(
 
 if __name__ == "__main__":
     with open("src/init.meow") as f:
-        create = post_process(f.read(), minify=True, purgeLogs=True, replaceQuotes=True)
+        create = post_process(
+            f.read(), minify=True, purgeLogs=True, replaceQuotes=True
+        )
         pass
 
     with open("build/rmml.ini", 'w') as f:
@@ -127,7 +134,7 @@ if __name__ == "__main__":
                 "[controller_events]\n",
                 f"create='{create}'\n",
                 "[basic_events]\n",
-                "create='if self.mod_name==undefined{self.mod_name=global.rmml_current_mod}'"
+                "create='if self.mod_name==undefined{self.mod_name=global.rmml_current_mod}'",
             ]
         )
 
@@ -140,10 +147,14 @@ if __name__ == "__main__":
                 "mod_0=rmml.ini\n",
             ]
         )
-    
-    with open("src/rmmm.md") as f:
+
+    # build rmmm
+    rmmm = Mod.from_csv("src/rmmm")
+    rmmm.to_md("build/rmmm.md")
+
+    with open("build/rmmm.md") as f:
         raw = f.read()
-        rmmm_version = raw.splitlines()[4][22:].replace('.', '-')
+        rmmm_version = raw.splitlines()[2][22:].replace('.', '-')
 
     with open("src/rmml.meow") as f:
         raw = f.read()
@@ -158,16 +169,18 @@ if __name__ == "__main__":
             [
                 "# put your mods here (or disable them with #)\n",
                 "# mods are loaded (and run) in the order written here\n",
-                "rmmm.md\n"
+                "rmmm.md\n",
             ]
         )
-    
+
     # shutil.copyfile("build/rmml.ini", "D:\\SteamLibrary\\steamapps\\common\\Mose\\mods\\rmml.ini")
     # shutil.copyfile("build/rmml.meow", "D:\\SteamLibrary\\steamapps\\common\\Mose\\mods\\rmml\\rmml.meow")
 
     # package rmml
     with zipfile.ZipFile(
-        f'dist/rmml_{rmml_version}_{rmmm_version}.zip', 'w', zipfile.ZIP_DEFLATED
+        f'dist/rmml_{rmml_version}_{rmmm_version}.zip',
+        'w',
+        zipfile.ZIP_DEFLATED,
     ) as package:
         package.write("build/meta_info.ini", "meta_info.ini")
         package.write("build/modlist.txt", "modlist.txt")
@@ -175,7 +188,7 @@ if __name__ == "__main__":
 
         package.write("src/rmmm.md", "rmml/rmmm.md")
         package.write("build/rmml.meow", "rmml/rmml.meow")
-    
+
     # package rmml and rmmm
     shutil.copyfile("build/rmml.meow", "dist/rmml.meow")
     shutil.copyfile("src/rmmm.md", "dist/rmmm.md")
