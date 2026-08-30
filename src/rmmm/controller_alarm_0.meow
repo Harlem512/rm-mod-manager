@@ -1,0 +1,2 @@
+-- renames the modlist
+file_rename("mods/back.modlist.txt", "mods/modlist.txt")

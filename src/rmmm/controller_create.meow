@@ -1,0 +1,201 @@
+-- manifest url
+-- DEBUG: test server
+-- self.manifest_url = "http://127.0.0.1:8080/manifest.json"
+if global.rmml.dev {
+  self.manifest_url = "https://raw.githubusercontent.com/Harlem512/rm-mod-database/refs/heads/qa/dev_manifest.json"
+} else {
+  self.manifest_url = "https://raw.githubusercontent.com/Harlem512/rm-mod-database/refs/heads/main/manifest.json"
+}
+
+self.manifest_file = "mods/rmmm/manifest.json"
+self.depth = 0
+-- rendering state
+-- -3: confirm RMMM reset
+-- -2: confirm mod delete
+-- -1: confirm save
+--  0: settings icon
+--  1: installed mods
+--  2: browse mods
+--  3: download manifest
+--  4: render game folder
+--  5: render save folder
+self.state = 0
+-- scroll for mod lists
+self.scroll = 0
+-- if we should show the full mod list on the main menu
+self.show_full_list = true
+-- true if we're downloading the foreign manifest
+self.downloading_manifest = undefined
+-- true if we must force a restart
+self.force_restart = false
+-- true if rmmm is being disabled (show a warning on the exit screen)
+self.disabling_rmmm = false
+
+-- true if a mod is being downloaded
+self.downloading_mod = false
+-- builds transformed foreign manifest
+self.transform_foreign_manifest = fun () {
+  let names = struct_get_names(self.foreign_manifest)
+  array_sort(names, true)
+  self.foreign_manifest_list = []
+  let j = 0
+  while j < array_length(names) {
+    let mod_name = names[j]
+    let meta = self.foreign_manifest[mod_name]
+    let local = self.local_manifest[mod_name]
+    if local {
+      meta._local = local.version
+    }
+    array_push(self.foreign_manifest_list, meta)
+    j += 1
+  }
+}
+
+-- temporary downloads
+self.directory = fun (file) {
+  return temp_directory_get() + "rmmm/" + file
+}
+
+-- -----------------------------------------------------------------------------
+--                            cache local manifest
+-- -----------------------------------------------------------------------------
+self.cache_local = fun () {
+  -- reset disable message
+  self.disabling_rmmm = false
+  -- raw manifest
+  let raw_manifest = {}
+  if file_exists(self.manifest_file) {
+    raw_manifest = global.parse_json_file(self.manifest_file)
+    if !raw_manifest {
+      global.rmml.warnings += "| Parsing error with local manifest, resetting"
+      file_delete(self.manifest_file)
+      raw_manifest = {}
+    }
+  }
+  if !raw_manifest["rmml.meow"] {
+    raw_manifest["rmml.meow"] = {
+      name: "rmml.meow",
+      display: "Rusted Moss Mod Loader",
+      description: "Invisible middleware that loads mods\n(It's already installed)",
+      author: "Harlem512",
+      version: global.rmml.version,
+      type: "meow",
+    }
+  }
+  if !raw_manifest["rmmm.md"] {
+    raw_manifest["rmmm.md"] = {
+      name: "rmmm.md",
+      display: "Rusted Moss Mod Manager",
+      description: "Manages mod installations and downloads mods.",
+      author: "Harlem512",
+      version: global.rmmm_version,
+      type: "md",
+    }
+  }
+
+  -- rebuild the local manifest, based on what's actually installed
+  self.local_manifest = {}
+  let local_mods = []
+  -- 16: include directories
+  let mod = file_find_first("mods/rmml/*", 16)
+  while mod != "" {
+    array_push(local_mods, mod)
+    -- raw manifest exists, use that
+    if raw_manifest[mod] {
+      self.local_manifest[mod] = raw_manifest[mod]
+    } else {
+      -- no raw manifest, time to bake
+      self.local_manifest[mod] = {
+        name: mod,
+        display: mod,
+        description: "[ Locally installed mod ]",
+        version: 0,
+        author: "Unknown",
+      }
+    }
+    mod = file_find_next()
+  }
+  file_find_close()
+
+  -- list of local mods and their data
+  self.sorted_local_mods = []
+
+  -- add mods that are on the modlist
+  let found_mods = {}
+  let f = file_text_open_read("mods/modlist.txt")
+  while !file_text_eof(f) {
+    let mod_path = string(string_trim(file_text_readln(f)))
+    let disabled = false
+
+    if string_starts_with(mod_path, "#") {
+      mod_path = string_copy(mod_path, 2, string_length(mod_path))
+      disabled = true
+    }
+
+    -- rmml is not a mod for the modlist
+    if mod_path == "rmml.meow" {
+      continue
+    }
+
+    -- add mod to the array if it exists locally and hasn't already been added
+    let manifest = self.local_manifest[mod_path]
+    if !found_mods[mod_path] and manifest {
+      found_mods[mod_path] = true
+      array_push(self.sorted_local_mods, {
+        path: mod_path,
+        disabled: disabled,
+        manifest: manifest
+      })
+    }
+  }
+  file_text_close(f)
+
+  -- add mods that are in the folder, but not known to rmmm's modlist
+  let i = 0
+  while i < array_length(local_mods) {
+    let mod = local_mods[i]
+    if !found_mods[mod] and mod != "rmml.meow" {
+      array_push(self.sorted_local_mods, {
+        path: mod,
+        disabled: true,
+        manifest: self.local_manifest[mod],
+      })
+    }
+    i += 1
+  }
+}
+
+self.save_mods = fun () {
+  let list = file_text_open_write("mods/modlist.txt")
+  file_text_write_string(list, "# put your mods here (or disable them with #)\n# mods are loaded (and run) in the order written here\n# this file is also managed by RMMM\n")
+  let i = 0
+  while i < array_length(self.sorted_local_mods) {
+    let mod = self.sorted_local_mods[i]
+    if mod.disabled {
+      file_text_write_string(list, "#" + mod.path + "\n")
+    } else {
+      file_text_write_string(list, mod.path + "\n")
+    }
+    i += 1
+  }
+  file_text_close(list)
+}
+
+
+self.save_manifest = fun () {
+  let manifest = file_text_open_write(self.manifest_file)
+  file_text_write_string(manifest, json_stringify(self.local_manifest))
+  file_text_close(manifest)
+}
+
+-- crash safety valve
+if !global.rmml.dev {
+  if file_exists("mods/back.modlist.txt") {
+    global.rmml.warn("Startup crash detected, disabled mods")
+    file_delete("mods/modlist.txt")
+    -- file_delete("mods/back.modlist.txt")
+  }
+  file_rename("mods/modlist.txt", "mods/back.modlist.txt")
+
+  alarm_set(0, 10)
+}
